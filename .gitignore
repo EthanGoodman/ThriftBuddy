@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+apps/api/fastapi-env/
+apps/api/.venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
