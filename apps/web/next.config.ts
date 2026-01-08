@@ -1,29 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  rewrites: async () => {
+  async rewrites() {
+    const apiOrigin = process.env.FASTAPI_ORIGIN;
+
+    if (!apiOrigin) return [];
+
     return [
       {
         source: "/api/py/:path*",
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/:path*"
-            : "/api/",
+        destination: `${apiOrigin}/api/py/:path*`,
       },
+      // optional convenience aliases:
       {
         source: "/docs",
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/docs"
-            : "/api/py/docs",
+        destination: `${apiOrigin}/api/py/docs`,
       },
       {
         source: "/openapi.json",
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/openapi.json"
-            : "/api/py/openapi.json",
+        destination: `${apiOrigin}/api/py/openapi.json`,
       },
     ];
   },
