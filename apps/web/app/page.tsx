@@ -17,17 +17,29 @@ export default function MyNextFastAPIApp() {
   const [files, setFiles] = useState<(File | null)[]>([null]);
 
   const [textInput, setTextInput] = useState<string>("");
-  const [result, setResult] = useState<string>("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
+  type Mode = "active" | "sold";
+
+  const [activeResult, setActiveResult] = useState<string>("");
+  const [soldResult, setSoldResult] = useState<string>("");
+
+  const [activeLoading, setActiveLoading] = useState(false);
+  const [soldLoading, setSoldLoading] = useState(false);
+
+  const [activeError, setActiveError] = useState<string>("");
+  const [soldError, setSoldError] = useState<string>("");
+
+  const activeBusy = activeLoading;
+  const soldBusy = soldLoading;
+  const anyBusy = activeBusy || soldBusy;
+
 
   // lightbox state
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lightboxName, setLightboxName] = useState<string>("");
 
-  const canSubmit = useMemo(() => {
-    return mainImage != null && !loading;
-  }, [mainImage, loading]);
+    const canSubmit = useMemo(() => {
+    return mainImage != null && !anyBusy;
+  }, [mainImage, anyBusy]);
 
   function addSlot() {
     setFiles((prev) => [...prev, null]);
@@ -86,49 +98,75 @@ export default function MyNextFastAPIApp() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [lightboxUrl]);
 
-  async function onSubmit() {
+    async function runMode(mode: Mode) {
     if (!mainImage) {
-      setError("Please upload a Main Image (full item, straight-on) before sending.");
+      const msg = "Please upload a Main Image (full item, straight-on) before sending.";
+      if (mode === "active") setActiveError(msg);
+      else setSoldError(msg);
       return;
     }
 
-    setLoading(true);
-    setError("");
-    setResult("");
+    // If you want to PREVENT running both at once, uncomment this:
+    // if (anyBusy) return;
+
+    // set state per mode
+    if (mode === "active") {
+      setActiveLoading(true);
+      setActiveError("");
+      setActiveResult("");
+    } else {
+      setSoldLoading(true);
+      setSoldError("");
+      setSoldResult("");
+    }
+
+    const controller = new AbortController();
 
     try {
       const form = new FormData();
-
-      // Required main image (separate field)
       form.append("main_image", mainImage);
 
       const prompt = textInput.trim();
       if (prompt.length > 0) form.append("text", prompt);
 
-      // Optional extras (same as before, but still under "files")
       const extras = files.filter(Boolean) as File[];
       for (const f of extras) form.append("files", f);
+
+      // IMPORTANT: tell backend which mode
+      form.append("mode", mode);
 
       const res = await fetch("/api/py/extract-file", {
         method: "POST",
         body: form,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(
-          `Request failed: ${res.status}${text ? ` - ${text}` : ""}`
-        );
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Request failed: ${res.status}${txt ? ` - ${txt}` : ""}`);
       }
 
       const data = await res.json();
-      setResult(data.raw_result ?? JSON.stringify(data, null, 2));
+      const payload = data.raw_result ?? JSON.stringify(data, null, 2);
+
+      if (mode === "active") setActiveResult(payload);
+      else setSoldResult(payload);
     } catch (e: any) {
-      setError(e?.message ?? "Unknown error");
+      const msg = e?.message ?? "Unknown error";
+      if (mode === "active") setActiveError(msg);
+      else setSoldError(msg);
     } finally {
-      setLoading(false);
+      if (mode === "active") setActiveLoading(false);
+      else setSoldLoading(false);
     }
   }
+
+  async function runBoth() {
+    // Running both concurrently is heavier (two backend jobs at once).
+    // This WILL increase timeouts / CPU load risk.
+    await Promise.allSettled([runMode("active"), runMode("sold")]);
+  }
+
 
   return (
     <div className="min-h-screen bg-slate-100 px-6 py-10">
@@ -153,11 +191,11 @@ export default function MyNextFastAPIApp() {
                   <button
                     type="button"
                     onClick={() => setMainImage(null)}
-                    disabled={loading}
+                    disabled={anyBusy}
                     className={[
                       "text-xs rounded-lg px-2 py-1",
                       "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100",
-                      loading ? "opacity-60 cursor-not-allowed" : "",
+                      anyBusy ? "opacity-60 cursor-not-allowed" : "",
                     ].join(" ")}
                   >
                     Clear
@@ -170,7 +208,7 @@ export default function MyNextFastAPIApp() {
                 accept="image/*"
                 onChange={(e) => setMainImage(e.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
-                disabled={loading}
+                disabled={anyBusy}
               />
 
               <div className="text-xs text-slate-600">
@@ -194,11 +232,11 @@ export default function MyNextFastAPIApp() {
                 onChange={(e) => setTextInput(e.target.value)}
                 placeholder="e.g., 'Identify the exact model if possible' or 'This is from the 90s'"
                 rows={3}
-                disabled={loading}
+                disabled={anyBusy}
                 className={[
                   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800",
                   "placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
-                  loading ? "opacity-60 cursor-not-allowed" : "",
+                  anyBusy ? "opacity-60 cursor-not-allowed" : "",
                 ].join(" ")}
               />
               <div className="text-xs text-slate-500">
@@ -222,7 +260,7 @@ export default function MyNextFastAPIApp() {
                     accept="image/*"
                     onChange={(e) => setSlotFile(idx, e.target.files?.[0] ?? null)}
                     className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-200 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-800 hover:file:bg-slate-300"
-                    disabled={loading}
+                    disabled={anyBusy}
                   />
 
                   <div className="flex gap-2">
@@ -230,11 +268,11 @@ export default function MyNextFastAPIApp() {
                       <button
                         type="button"
                         onClick={addSlot}
-                        disabled={loading}
+                        disabled={anyBusy}
                         className={[
                           "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium",
                           "bg-slate-200 text-slate-800 hover:bg-slate-300",
-                          loading ? "opacity-60 cursor-not-allowed" : "",
+                          anyBusy ? "opacity-60 cursor-not-allowed" : "",
                         ].join(" ")}
                         title="Add another image"
                       >
@@ -246,11 +284,11 @@ export default function MyNextFastAPIApp() {
                       <button
                         type="button"
                         onClick={() => removeSlot(idx)}
-                        disabled={loading}
+                        disabled={anyBusy}
                         className={[
                           "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium",
                           "bg-slate-200 text-slate-800 hover:bg-slate-300",
-                          loading ? "opacity-60 cursor-not-allowed" : "",
+                          anyBusy ? "opacity-60 cursor-not-allowed" : "",
                         ].join(" ")}
                         title="Remove this image"
                       >
@@ -264,39 +302,106 @@ export default function MyNextFastAPIApp() {
               <div className="text-xs text-slate-600">
                 Main: {mainImage ? "1" : "0"} / 1 · Extras: {files.filter(Boolean).length} / {files.length}
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => runMode("active")}
+                  disabled={!mainImage || activeBusy || soldBusy /* disable if you want to prevent overlap */}
+                  className={[
+                    "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium",
+                    "text-white shadow-sm transition",
+                    (!mainImage || activeBusy || soldBusy)
+                      ? "bg-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
+                  ].join(" ")}
+                >
+                  {activeLoading ? "Loading Active..." : "Get Active Listings"}
+                </button>
 
-              <button
-                onClick={onSubmit}
-                disabled={!canSubmit}
-                className={[
-                  "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium",
-                  "text-white shadow-sm transition w-full sm:w-auto",
-                  !canSubmit
-                    ? "bg-slate-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
-                ].join(" ")}
-              >
-                {loading ? "Extracting..." : "Send"}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => runMode("sold")}
+                  disabled={!mainImage || soldBusy || activeBusy /* disable if you want to prevent overlap */}
+                  className={[
+                    "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium",
+                    "text-white shadow-sm transition",
+                    (!mainImage || soldBusy || activeBusy)
+                      ? "bg-slate-400 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800",
+                  ].join(" ")}
+                >
+                  {soldLoading ? "Loading Sold..." : "Get Sold Listings"}
+                </button>
 
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                {error}
+                <button
+                  type="button"
+                  onClick={runBoth}
+                  disabled={!mainImage || anyBusy}
+                  className={[
+                    "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium",
+                    "text-slate-900 shadow-sm transition border",
+                    (!mainImage || anyBusy)
+                      ? "bg-slate-200 cursor-not-allowed border-slate-200"
+                      : "bg-white hover:bg-slate-50 border-slate-300",
+                  ].join(" ")}
+                  title="Runs Active and Sold at the same time (heavier)."
+                >
+                  Run Both
+                </button>
               </div>
-            )}
-
-            <div className="rounded-xl bg-slate-950 text-slate-100 p-4 max-w-full overflow-x-auto">
-              {result ? (
-                <pre className="m-0 whitespace-pre-wrap break-words break-all text-xs leading-relaxed">
-                  {result}
-                </pre>
-              ) : (
-                <div className="text-sm text-slate-300">
-                  No output yet. Upload a <span className="font-medium">Main Image</span>, optionally add extras/text, and click{" "}
-                  <span className="font-medium">Send</span>.
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* ACTIVE */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800">Active Listings Output</h3>
+                  <span className="text-xs text-slate-500">{activeLoading ? "running…" : ""}</span>
                 </div>
-              )}
+
+                {activeError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {activeError}
+                  </div>
+                )}
+
+                <div className="rounded-xl bg-slate-950 text-slate-100 p-4 max-w-full overflow-x-auto">
+                  {activeResult ? (
+                    <pre className="m-0 whitespace-pre-wrap break-words break-all text-xs leading-relaxed">
+                      {activeResult}
+                    </pre>
+                  ) : (
+                    <div className="text-sm text-slate-300">
+                      Click <span className="font-medium">Get Active Listings</span> to run the active query.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SOLD */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800">Sold Listings Output</h3>
+                  <span className="text-xs text-slate-500">{soldLoading ? "running…" : ""}</span>
+                </div>
+
+                {soldError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {soldError}
+                  </div>
+                )}
+
+                <div className="rounded-xl bg-slate-950 text-slate-100 p-4 max-w-full overflow-x-auto">
+                  {soldResult ? (
+                    <pre className="m-0 whitespace-pre-wrap break-words break-all text-xs leading-relaxed">
+                      {soldResult}
+                    </pre>
+                  ) : (
+                    <div className="text-sm text-slate-300">
+                      Click <span className="font-medium">Get Sold Listings</span> to run the sold query.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
