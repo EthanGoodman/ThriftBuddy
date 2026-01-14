@@ -3,191 +3,14 @@ from fastapi.responses import JSONResponse
 import base64
 import os
 from openai import OpenAI
+import json
+import httpx
+from fastapi import HTTPException
+import common
 
 app = FastAPI()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-EXTRACTION_PROMPT = """
-You are an expert product identifier for second-hand marketplaces.
-
-Your goal is to identify items as specifically as possible using visual evidence,
-while generating strong search hypotheses when exact identification is not visually confirmed.
-
-PRIMARY SOURCE OF TRUTH:
-- The image(s) are the primary source of truth.
-- Optional user-provided text may be missing, incomplete, or incorrect.
-
-Analyze the uploaded image(s) and extract information that is:
-- directly visible in the image, OR
-- strongly supported by visible features and construction.
-
-────────────────────────────────────────────
-OPTIONAL USER TEXT (may be missing or incorrect)
-────────────────────────────────────────────
-If user-provided text is present:
-- Treat it as a hint, not ground truth.
-- Use it to guide what to look for (labels, mechanisms, materials, era cues).
-- Use it to refine search queries and disambiguation questions.
-- Do NOT copy claims from user text into brand/model/year fields unless:
-  (a) the image visually supports them, OR
-  (b) uncertainty is clearly explained and confidence is reduced.
-- If user text conflicts with the image, trust the image and note the conflict in reasoning.
-- If user text is vague (e.g., “rare”, “vintage”, “expensive”), do not treat it as evidence.
-
-────────────────────────────────────────────
-IDENTIFICATION STRATEGY (DO NOT STOP EARLY)
-────────────────────────────────────────────
-When identifying the item, do NOT stop at a generic category if the image supports more specificity.
-
-If the exact brand or model cannot be visually confirmed, you MUST still identify:
-- the functional subtype
-- the intended user (consumer, professional, industrial, hobbyist)
-- the design class or configuration
-
-Acceptable descriptive specificity WITHOUT guessing brands/models includes:
-- “turntable” → “direct-drive DJ turntable” → “broadcast-style transcription turntable”
-- “camera” → “35mm SLR” → “manual-focus mechanical SLR”
-- “jacket” → “varsity jacket” → “wool varsity jacket with chenille patches”
-- “CD holder” → “teak CD rack” → “push-button eject CD storage system”
-
-Only stop increasing specificity when further detail would require guessing unseen information.
-
-────────────────────────────────────────────
-DISTINCTIVE FEATURE PRIORITY (CRITICAL)
-────────────────────────────────────────────
-Actively search for and prioritize distinctive or identity-bearing features, including:
-- unusual mechanisms (e.g., push-button eject, spring-loaded slots)
-- moving parts or user interactions
-- joinery or construction methods
-- materials and finishes (e.g., teak, solid wood vs veneer)
-- mounting hardware (wall-mount vs freestanding)
-- modularity, capacity, or layout patterns
-
-If distinctive features are present, they MUST be reflected in:
-- item_guess.specific_name
-- item_guess.reasoning
-- search_queries (including keywords and ebay_terms)
-
-Generic descriptions are insufficient when distinctive construction or mechanisms are visible.
-
-────────────────────────────────────────────
-BRANDS, MODELS, AND HALLUCINATION CONTROL
-────────────────────────────────────────────
-Do NOT hallucinate brand names, models, years, or artists unless:
-- visible text, logos, labels, or stamps support them, OR
-- they are clearly presented as hypotheses in search_queries (not claims).
-
-Brand/model hypotheses should generally appear in search_queries, NOT as factual fields.
-
-────────────────────────────────────────────
-CONFIDENCE CALIBRATION
-────────────────────────────────────────────
-- If brand/model/year are not visually confirmed, item_guess.confidence should generally not exceed 0.65.
-- If the identification remains generic, item_guess.confidence should not exceed 0.55.
-- overall_extraction_confidence should reflect completeness of evidence (images, text, features).
-
-If unsure, return null for uncertain fields and lower confidence accordingly.
-
-────────────────────────────────────────────
-TEXT EXTRACTION
-────────────────────────────────────────────
-Extract all readable text from:
-- tags / labels
-- printed graphics (front and back)
-- packaging text
-- copyright lines
-
-────────────────────────────────────────────
-GRAPHIC DESCRIPTION
-────────────────────────────────────────────
-Describe the graphic literally in 12 words or fewer.
-Do not infer meaning, brand, or value here.
-
-────────────────────────────────────────────
-SEARCH QUERY + KEYWORD GENERATION (MARKETPLACE-READY)
-────────────────────────────────────────────
-Generate 6–10 search query objects suitable for Google and marketplaces like eBay/Etsy.
-
-For EACH search query object, provide:
-- query: a natural-language query string (3–10 words), specific → broad across the list
-- precision: high/medium/broad
-- keywords: 6–20 core keywords/phrases that MUST appear (include material, form factor, mechanism)
-- ebay_terms: 4–12 marketplace-preferred synonyms or phrasing (e.g., “eject”, “dispenser”, “rack”, “holder”)
-
-Requirements:
-- At least 3 queries must include distinctive mechanisms or materials.
-- keywords MUST include at least one mechanism term when a mechanism is visible.
-- ebay_terms should prefer common listing language over technical phrasing.
-  Example: prefer “eject” over “push-button mechanism” when appropriate.
-- If item appears design-forward, vintage, or specialty-made, include 1–2 candidate
-  brand/designer queries as hypotheses (not claims).
-
-────────────────────────────────────────────
-DISAMBIGUATION REQUIREMENT
-────────────────────────────────────────────
-If brand/model/year are not visually confirmed, include 3–6 disambiguation_questions.
-Questions should focus on confirming identity (underside/back, labels/stamps, mechanism close-ups,
-mounting hardware, measurements, capacity).
-
-────────────────────────────────────────────
-OUTPUT REQUIREMENTS
-────────────────────────────────────────────
-Always attempt a best-effort specific item guess.
-Explain uncertainty clearly.
-Return ONLY valid JSON matching the schema below.
-Do NOT include any extra text outside the JSON.
-
-Schema:
-
-{
-  "item_guess": {
-    "specific_name": string | null,
-    "brand": string | null,
-    "collection_or_artist": string | null,
-    "year_or_era": string | null,
-    "confidence": number (0–1),
-    "reasoning": string
-  },
-
-  "physical_attributes": {
-    "item_type": string,
-    "category": string | null,
-    "color": string | null,
-    "material": string | null,
-    "size_visible": string | null
-  },
-
-  "visible_text": {
-    "tag_text": string,
-    "front_print_text": string,
-    "back_print_text": string,
-    "copyright_text": string
-  },
-
-  "graphic_description": string,
-
-  "condition_guess": string | null,
-
-  "identifiers": {
-    "upc": string | null,
-    "serial_number": string | null,
-    "other": string | null
-  },
-
-  "search_queries": [
-    {
-      "query": string,
-      "precision": "high" | "medium" | "broad",
-      "keywords": [string],
-      "ebay_terms": [string],
-    }
-  ],
-
-  "disambiguation_questions": [string],
-
-  "overall_extraction_confidence": number (0–1)
-}
-"""
 
 from typing import List
 from fastapi import UploadFile, File
@@ -199,15 +22,222 @@ from fastapi import File, Form, UploadFile
 from fastapi.responses import JSONResponse
 import base64
 
+SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
+
+import math
+import re
+from typing import Any, Dict, List, Optional
+
+def _to_float_price(item: Dict[str, Any]) -> Optional[float]:
+    """
+    Prefer SerpApi's numeric extracted price. Fall back to parsing raw.
+    Returns None if no usable price.
+    """
+    price = item.get("price")
+    if isinstance(price, dict):
+        extracted = price.get("extracted")
+        if isinstance(extracted, (int, float)):
+            return float(extracted)
+
+        raw = price.get("raw")
+        if isinstance(raw, str):
+            # parse like "$1,234.56"
+            m = re.search(r"([\d,]+(\.\d+)?)", raw)
+            if m:
+                return float(m.group(1).replace(",", ""))
+
+    # Some engines might put price elsewhere; you can extend later.
+    return None
+
+def _percentile(sorted_vals: List[float], p: float) -> Optional[float]:
+    """
+    Percentile with linear interpolation (like numpy's default-ish behavior).
+    p in [0, 1]. Returns None if empty.
+    """
+    n = len(sorted_vals)
+    if n == 0:
+        return None
+    if n == 1:
+        return sorted_vals[0]
+
+    idx = (n - 1) * p
+    lo = math.floor(idx)
+    hi = math.ceil(idx)
+    if lo == hi:
+        return sorted_vals[lo]
+    weight = idx - lo
+    return sorted_vals[lo] * (1 - weight) + sorted_vals[hi] * weight
+
+async def serpapi_ebay_search(query: str, ipg: int = 50, sold: bool = False) -> dict:
+    api_key = os.getenv("SERPAPI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="SERPAPI_API_KEY is not set")
+
+    params = {
+        "engine": "ebay",
+        "_nkw": query,
+        "_ipg": ipg,  # 25/50/100/200
+        "api_key": api_key,
+    }
+    if sold:
+        params["show_only"] = "Sold"  # or "Complete"
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(SERPAPI_ENDPOINT, params=params)
+        r.raise_for_status()
+        return r.json()
+    
+def _get_condition(item: Dict[str, Any]) -> Optional[str]:
+  """
+  Normalizes condition to a small set: 'new', 'used', 'other', None
+  Based on SerpApi item['condition'] string.
+  """
+  c = item.get("condition")
+  if not isinstance(c, str) or not c.strip():
+      return None
+
+  c_norm = c.strip().lower()
+
+  # Common cases
+  if "brand new" in c_norm or c_norm == "new":
+      return "new"
+  if "pre-owned" in c_norm or "used" in c_norm:
+      return "used"
+
+  # Sometimes you might see "Open box", "Refurbished", "Like New", etc.
+  # Keep these as "other" so they don't pollute new/used if you want clean separation.
+  return "other"
+
+
+def _iqr_bounds(sorted_vals: List[float]) -> Optional[Dict[str, float]]:
+    """
+    Returns IQR bounds: [Q1 - 1.5*IQR, Q3 + 1.5*IQR]
+    Expects sorted list. Returns None if not enough values.
+    """
+    if len(sorted_vals) < 4:
+        # With tiny samples, outlier filtering tends to do weird things.
+        return None
+
+    q1 = _percentile(sorted_vals, 0.25)
+    q3 = _percentile(sorted_vals, 0.75)
+    if q1 is None or q3 is None:
+        return None
+
+    iqr = q3 - q1
+    return {
+        "q1": q1,
+        "q3": q3,
+        "iqr": iqr,
+        "low": q1 - 1.5 * iqr,
+        "high": q3 + 1.5 * iqr,
+    }
+
+
+def filter_outliers_iqr(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Filters items by IQR bounds based on extracted prices.
+    Returns:
+      {
+        "filtered_items": [...],
+        "outliers_removed": int,
+        "bounds": {...} | None
+      }
+    """
+    prices = [p for p in (_to_float_price(x) for x in items) if p is not None]
+    prices.sort()
+
+    bounds = _iqr_bounds(prices)
+    if not bounds:
+        # Not enough data to reliably filter
+        return {"filtered_items": items, "outliers_removed": 0, "bounds": None}
+
+    low, high = bounds["low"], bounds["high"]
+
+    filtered = []
+    removed = 0
+    for it in items:
+        p = _to_float_price(it)
+        if p is None:
+            # keep missing-price items out of price stats anyway; harmless to keep
+            filtered.append(it)
+            continue
+        if p < low or p > high:
+            removed += 1
+            continue
+        filtered.append(it)
+
+    return {"filtered_items": filtered, "outliers_removed": removed, "bounds": bounds}
+
+
+def compute_price_summary(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    prices = [p for p in (_to_float_price(x) for x in items) if p is not None]
+    prices.sort()
+
+    return {
+        "n_items_total": len(items),
+        "n_items_with_price": len(prices),
+        "min_price": prices[0] if prices else None,
+        "q1_price": _percentile(prices, 0.25),
+        "median_price": _percentile(prices, 0.50),
+        "q3_price": _percentile(prices, 0.75),
+        "max_price": prices[-1] if prices else None,
+    }
+
+
+def compute_segmented_summaries(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Returns summaries for:
+      - all
+      - new
+      - used
+      - other_condition
+    Each includes raw and outlier-filtered stats.
+    """
+    def summarize(label_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        out = filter_outliers_iqr(label_items)
+        filtered_items = out["filtered_items"]
+        return {
+            "raw": compute_price_summary(label_items),
+            "filtered": compute_price_summary(filtered_items),
+            "outliers_removed": out["outliers_removed"],
+            "iqr_bounds": out["bounds"],  # includes low/high if computed
+        }
+
+    buckets = {"new": [], "used": [], "other": [], "unknown": []}
+    for it in items:
+        c = _get_condition(it)
+        if c == "new":
+            buckets["new"].append(it)
+        elif c == "used":
+            buckets["used"].append(it)
+        elif c == "other":
+            buckets["other"].append(it)
+        else:
+            buckets["unknown"].append(it)
+
+    return {
+        "all": summarize(items),
+        "by_condition": {
+            "new": summarize(buckets["new"]),
+            "used": summarize(buckets["used"]),
+            "other": summarize(buckets["other"]),
+            "unknown": summarize(buckets["unknown"]),
+        },
+    }
+
+
+def display_count(n: int) -> str | int:
+    return "200+" if n >= 200 else n
+
+
 @app.post("/api/py/extract-file")
 async def extract_from_files(
     files: List[UploadFile] = File(...),
-    text: Optional[str] = Form(None),  # <-- NEW
+    text: Optional[str] = Form(None),
 ):
     # Build one "content" list: prompt once + optional user text + many images
-    content = [{"type": "input_text", "text": EXTRACTION_PROMPT}]
+    content = [{"type": "input_text", "text": common.EXTRACTION_PROMPT}]
 
-    # NEW: include user-provided text if present
     if text and text.strip():
         content.append({"type": "input_text", "text": text.strip()})
 
@@ -215,18 +245,86 @@ async def extract_from_files(
         img_bytes = await f.read()
         b64 = base64.b64encode(img_bytes).decode("utf-8")
         data_url = f"data:{f.content_type};base64,{b64}"
-
         content.append({"type": "input_image", "image_url": data_url})
 
     resp = client.responses.create(
         model="gpt-4o-mini",
-        input=[{
-            "role": "user",
-            "content": content,
-        }],
+        input=[{"role": "user", "content": content}],
         max_output_tokens=900,
     )
 
-    return JSONResponse({"raw_result": resp.output_text})
+    # Parse LLM output as JSON
+    raw_text = resp.output_text
+    try:
+        extracted = json.loads(raw_text)
+    except json.JSONDecodeError:
+        # Return the raw text so you can see why parsing failed
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": "LLM did not return valid JSON",
+                "raw_result": raw_text,
+            },
+        )
+
+    # Pick one query (first one)
+    search_queries = extracted.get("search_queries") or []
+    if not search_queries or not isinstance(search_queries, list):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": "No search_queries returned by LLM",
+                "extracted": extracted,
+            },
+        )
+
+    chosen = search_queries[0]
+    query = chosen.get("query")
+    if not query:
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": "First search query object missing 'query'",
+                "chosen": chosen,
+                "extracted": extracted,
+            },
+        )
+
+    # Active listings
+    serp_active = await serpapi_ebay_search(query=query, ipg=50, sold=False)
+    active_items = serp_active.get("organic_results") or []
+
+    active_stats = compute_segmented_summaries(active_items)
+    active_listings = display_count(len(active_items))
+
+    # Sold listings (separate call)
+    serp_sold = await serpapi_ebay_search(query=query, ipg=50, sold=True)
+    sold_items = serp_sold.get("organic_results") or []
+
+    sold_stats = compute_segmented_summaries(sold_items)
+    sold_listings = display_count(len(sold_items))
+
+
+
+    # Return SerpApi results (and optionally include the chosen query for debugging)
+    return JSONResponse(
+      {
+        "chosen_query": chosen,
+        "active": {
+            "listings": active_listings,
+            "stats": active_stats,
+        },
+        "sold": {
+            "listings": sold_listings,
+            "stats": sold_stats,
+        },
+        # keep raw responses for testing / debugging
+        "serpapi_active": serp_active,
+        "serpapi_sold": serp_sold,
+      }
+    )
+
+
+
 
 
