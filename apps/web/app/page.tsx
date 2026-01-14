@@ -3,14 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Preview = {
-  idx: number;
+  key: string;          // unique key for React
   url: string;
   name: string;
+  label: string;        // "Main" or "Extra #"
 };
 
 export default function MyNextFastAPIApp() {
-  // each slot can hold one image file
+  // REQUIRED main image
+  const [mainImage, setMainImage] = useState<File | null>(null);
+
+  // OPTIONAL extra images (slots)
   const [files, setFiles] = useState<(File | null)[]>([null]);
+
   const [textInput, setTextInput] = useState<string>("");
   const [result, setResult] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -20,10 +25,9 @@ export default function MyNextFastAPIApp() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lightboxName, setLightboxName] = useState<string>("");
 
-  const canSubmit = useMemo(
-    () => files.some((f) => f != null) && !loading,
-    [files, loading]
-  );
+  const canSubmit = useMemo(() => {
+    return mainImage != null && !loading;
+  }, [mainImage, loading]);
 
   function addSlot() {
     setFiles((prev) => [...prev, null]);
@@ -39,14 +43,32 @@ export default function MyNextFastAPIApp() {
 
   // Build preview URLs for selected files
   const previews: Preview[] = useMemo(() => {
-    return files
-      .map((f, idx) => {
-        if (!f) return null;
-        return { idx, url: URL.createObjectURL(f), name: f.name };
-      })
-      .filter(Boolean) as Preview[];
-    // NOTE: URLs are cleaned up in the useEffect below
-  }, [files]);
+    const list: Preview[] = [];
+
+    if (mainImage) {
+      list.push({
+        key: "main",
+        url: URL.createObjectURL(mainImage),
+        name: mainImage.name,
+        label: "Main",
+      });
+    }
+
+    const extras = files
+      .map((f, idx) => ({ f, idx }))
+      .filter(({ f }) => f != null) as { f: File; idx: number }[];
+
+    extras.forEach(({ f, idx }, i) => {
+      list.push({
+        key: `extra-${idx}`,
+        url: URL.createObjectURL(f),
+        name: f.name,
+        label: `Extra ${i + 1}`,
+      });
+    });
+
+    return list;
+  }, [mainImage, files]);
 
   // Cleanup object URLs when previews change/unmount
   useEffect(() => {
@@ -65,8 +87,10 @@ export default function MyNextFastAPIApp() {
   }, [lightboxUrl]);
 
   async function onSubmit() {
-    const selected = files.filter(Boolean) as File[];
-    if (selected.length === 0) return;
+    if (!mainImage) {
+      setError("Please upload a Main Image (full item, straight-on) before sending.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -75,10 +99,15 @@ export default function MyNextFastAPIApp() {
     try {
       const form = new FormData();
 
+      // Required main image (separate field)
+      form.append("main_image", mainImage);
+
       const prompt = textInput.trim();
       if (prompt.length > 0) form.append("text", prompt);
 
-      for (const f of selected) form.append("files", f);
+      // Optional extras (same as before, but still under "files")
+      const extras = files.filter(Boolean) as File[];
+      for (const f of extras) form.append("files", f);
 
       const res = await fetch("/api/py/extract-file", {
         method: "POST",
@@ -104,15 +133,55 @@ export default function MyNextFastAPIApp() {
   return (
     <div className="min-h-screen bg-slate-100 px-6 py-10">
       <div className="mx-auto w-full max-w-6xl">
-        {/* two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
-          {/* LEFT: main card */}
+          {/* LEFT */}
           <div className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-black/5 space-y-5">
             <div className="space-y-1">
               <h1 className="text-xl font-semibold">🧠 ThriftBuddy Extract (Test)</h1>
               <p className="text-sm text-slate-600">
-                Upload one or more images, optionally add text, send to FastAPI, and view the extracted JSON.
+                Upload a <span className="font-medium">Main Image</span> (full item, straight-on). Extras are optional.
               </p>
+            </div>
+
+            {/* REQUIRED main image */}
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-semibold text-slate-800">
+                  Main Image <span className="text-red-600">*</span>
+                </label>
+                {mainImage ? (
+                  <button
+                    type="button"
+                    onClick={() => setMainImage(null)}
+                    disabled={loading}
+                    className={[
+                      "text-xs rounded-lg px-2 py-1",
+                      "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100",
+                      loading ? "opacity-60 cursor-not-allowed" : "",
+                    ].join(" ")}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setMainImage(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
+                disabled={loading}
+              />
+
+              <div className="text-xs text-slate-600">
+                Required for photo-matching later. Try: full item, straight-on, fill the frame.
+              </div>
+
+              {!mainImage && (
+                <div className="text-xs text-red-700">
+                  Main Image is required to submit.
+                </div>
+              )}
             </div>
 
             {/* Optional text input */}
@@ -137,8 +206,15 @@ export default function MyNextFastAPIApp() {
               </div>
             </div>
 
-            {/* File slots */}
+            {/* OPTIONAL extra file slots */}
             <div className="space-y-3">
+              <div className="text-sm font-medium text-slate-800">
+                Extra Images (optional)
+                <div className="text-xs text-slate-500 font-normal">
+                  Tags, close-ups, flaws, alternate angles.
+                </div>
+              </div>
+
               {files.map((file, idx) => (
                 <div key={idx} className="flex flex-col sm:flex-row gap-3 sm:items-center">
                   <input
@@ -186,7 +262,7 @@ export default function MyNextFastAPIApp() {
               ))}
 
               <div className="text-xs text-slate-600">
-                Selected: {files.filter(Boolean).length} / {files.length} image(s)
+                Main: {mainImage ? "1" : "0"} / 1 · Extras: {files.filter(Boolean).length} / {files.length}
               </div>
 
               <button
@@ -217,15 +293,14 @@ export default function MyNextFastAPIApp() {
                 </pre>
               ) : (
                 <div className="text-sm text-slate-300">
-                  No output yet. Upload image(s), optionally add text, and click{" "}
+                  No output yet. Upload a <span className="font-medium">Main Image</span>, optionally add extras/text, and click{" "}
                   <span className="font-medium">Send</span>.
                 </div>
               )}
             </div>
-
           </div>
 
-          {/* RIGHT: thumbnails panel */}
+          {/* RIGHT */}
           <div className="rounded-2xl bg-white p-4 shadow-lg ring-1 ring-black/5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-slate-800">Selected Images</h2>
@@ -238,7 +313,7 @@ export default function MyNextFastAPIApp() {
               <div className="grid grid-cols-3 lg:grid-cols-2 gap-2">
                 {previews.map((p) => (
                   <button
-                    key={p.idx}
+                    key={p.key}
                     type="button"
                     onClick={() => {
                       setLightboxUrl(p.url);
@@ -254,7 +329,7 @@ export default function MyNextFastAPIApp() {
                       className="h-full w-full object-cover group-hover:scale-[1.02] transition"
                     />
                     <div className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5 text-[10px] text-white truncate">
-                      {p.name}
+                      {p.label}: {p.name}
                     </div>
                   </button>
                 ))}
@@ -273,7 +348,6 @@ export default function MyNextFastAPIApp() {
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
           onMouseDown={(e) => {
-            // close if you click the backdrop (not the image)
             if (e.target === e.currentTarget) setLightboxUrl(null);
           }}
         >
