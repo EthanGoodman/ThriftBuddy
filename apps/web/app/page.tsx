@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 export default function MyNextFastAPIApp() {
   // each slot can hold one image file
   const [files, setFiles] = useState<(File | null)[]>([null]);
+  const [textInput, setTextInput] = useState<string>(""); // <-- NEW (optional text)
   const [result, setResult] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -37,6 +38,12 @@ export default function MyNextFastAPIApp() {
     try {
       const form = new FormData();
 
+      // NEW: optional text field (send only if non-empty after trimming)
+      const prompt = textInput.trim();
+      if (prompt.length > 0) {
+        form.append("text", prompt); // backend can read as Form field named "text"
+      }
+
       // Send all images. FastAPI will read this as a list if you name it `files`.
       for (const f of selected) {
         form.append("files", f); // same key repeated => list on backend
@@ -49,7 +56,9 @@ export default function MyNextFastAPIApp() {
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throw new Error(`Request failed: ${res.status}${text ? ` - ${text}` : ""}`);
+        throw new Error(
+          `Request failed: ${res.status}${text ? ` - ${text}` : ""}`
+        );
       }
 
       const data = await res.json();
@@ -67,8 +76,32 @@ export default function MyNextFastAPIApp() {
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">🧠 ThriftBuddy Extract (Test)</h1>
           <p className="text-sm text-slate-600">
-            Upload one or more images, send them to FastAPI, and view the extracted JSON.
+            Upload one or more images, optionally add text, send to FastAPI, and
+            view the extracted JSON.
           </p>
+        </div>
+
+        {/* NEW: optional text input */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Optional text (extra context / prompt)
+          </label>
+          <textarea
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+            placeholder="e.g., 'Identify the exact model if possible' or 'This is from the 90s'"
+            rows={3}
+            disabled={loading}
+            className={[
+              "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800",
+              "placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+              loading ? "opacity-60 cursor-not-allowed" : "",
+            ].join(" ")}
+          />
+          <div className="text-xs text-slate-500">
+            Sent as form field <span className="font-mono">text</span> only if
+            non-empty.
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -79,6 +112,7 @@ export default function MyNextFastAPIApp() {
                 accept="image/*"
                 onChange={(e) => setSlotFile(idx, e.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-200 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-800 hover:file:bg-slate-300"
+                disabled={loading}
               />
 
               <div className="flex gap-2">
@@ -119,8 +153,7 @@ export default function MyNextFastAPIApp() {
 
           {/* optional: tiny summary */}
           <div className="text-xs text-slate-600">
-            Selected:{" "}
-            {files.filter(Boolean).length} / {files.length} image(s)
+            Selected: {files.filter(Boolean).length} / {files.length} image(s)
           </div>
 
           <button
@@ -129,7 +162,9 @@ export default function MyNextFastAPIApp() {
             className={[
               "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium",
               "text-white shadow-sm transition w-full sm:w-auto",
-              !canSubmit ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
+              !canSubmit
+                ? "bg-slate-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
             ].join(" ")}
           >
             {loading ? "Extracting..." : "Send"}
@@ -144,10 +179,13 @@ export default function MyNextFastAPIApp() {
 
         <div className="rounded-xl bg-slate-950 text-slate-100 p-4">
           {result ? (
-            <pre className="m-0 whitespace-pre-wrap break-words text-xs leading-relaxed">{result}</pre>
+            <pre className="m-0 whitespace-pre-wrap break-words text-xs leading-relaxed">
+              {result}
+            </pre>
           ) : (
             <div className="text-sm text-slate-300">
-              No output yet. Upload image(s) and click <span className="font-medium">Send</span>.
+              No output yet. Upload image(s), optionally add text, and click{" "}
+              <span className="font-medium">Send</span>.
             </div>
           )}
         </div>
