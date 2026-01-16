@@ -18,7 +18,6 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
 TOPK_SIGNAL = 10
 
-THUMB_CONCURRENCY = 6
 RERANK_THRESHOLD = 0.25
 SEPARATION_THRESHOLD = 0.05
 
@@ -132,6 +131,36 @@ async def get_initial_query(
         )
 
     return query, True, extracted
+
+async def maybe_fallback_to_llm_when_text_fails(
+    *,
+    original_text: Optional[str],
+    refined_query: Optional[str],
+    main_image: UploadFile,
+    main_bytes: bytes,
+    files: List[UploadFile],
+    extra_bytes: List[bytes],
+) -> Optional[str]:
+    """
+    If user gave text but we couldn't refine confidently, generate a new query via LLM.
+    Returns new_query or None.
+    """
+    if not (original_text and original_text.strip()):
+        return None
+    if refined_query:
+        return None  # text succeeded enough
+
+    # Call LLM for a better initial query (uses images + optional text)
+    # Reuse get_initial_query but force it down the LLM path by passing text=None
+    llm_query, _used_llm, _extracted = await get_initial_query(
+        text=None,
+        main_image=main_image,
+        main_bytes=main_bytes,
+        files=files,
+        extra_bytes=extra_bytes,
+    )
+    return llm_query
+
 
 async def fetch_initial_serp_results(
     *,
@@ -267,6 +296,37 @@ async def extract_from_files(
             sold_items=sold_items,
             main_vecs=main_vecs,
         )
+
+        # 7.5) Optional: if text provided but no refinement, fallback to LLM initial query
+        fallback_llm_query = await maybe_fallback_to_llm_when_text_fails(
+            original_text=text,
+            refined_query=refined_query,
+            main_image=main_image,
+            main_bytes=main_bytes,
+            files=files,
+            extra_bytes=extra_bytes,
+        )
+
+        if fallback_llm_query:
+            # redo initial serp + thumbs + rerank + refinement, but now using llm_query
+            query = fallback_llm_query
+            used_llm = True
+
+            serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
+            active_items = extract_items(serp_active)
+            sold_items = extract_items(serp_sold)
+
+            await image_processing.embed_initial_thumbnails_if_needed(active_items=active_items, sold_items=sold_items, mode=mode)
+            active_ranked, sold_ranked = rerank_initial_for_signal(
+                active_items=active_items, sold_items=sold_items, main_vecs=main_vecs, mode=mode
+            )
+            refined_query = await query_refining.refine_query_if_confident(
+                original_query=query,
+                active_items=active_items,
+                sold_items=sold_items,
+                main_vecs=main_vecs,
+            )
+
 
         # 8) Final candidates: refined if exists else initial
         final_candidates = await fetch_final_candidates(
