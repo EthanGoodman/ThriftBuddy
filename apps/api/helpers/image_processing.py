@@ -18,7 +18,7 @@ _CLIP_PREPROCESS = None
 _CLIP_TOKENIZER = None
 _CLIP_DEVICE = "cpu"  # keep CPU for now (safe default)
 MAIN_CROPS = [1.0, 0.85]
-EMBED_MAX_INITIAL = 10
+EMBED_MAX_INITIAL = 50
 THUMB_CONCURRENCY = 6
 
 def _load_clip():

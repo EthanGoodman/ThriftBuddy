@@ -16,19 +16,17 @@ app = FastAPI()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
-TOPK_SIGNAL = 10
-
-RERANK_THRESHOLD = 0.25
+# For stats: keep anything above this similarity
+SIMILARITY_MIN = 0.55
+# For display: show top N matches (output_builder already uses 10)
+DISPLAY_TOPK = 10
 SEPARATION_THRESHOLD = 0.05
+
 
 @app.on_event("startup")
 def _startup():
     image_processing._load_clip()
 
-
-# -----------------------------
-# Small helpers / primitives
-# -----------------------------
 
 def normalize_mode(mode: str) -> str:
     mode = (mode or "both").strip().lower()
@@ -36,8 +34,10 @@ def normalize_mode(mode: str) -> str:
         raise HTTPException(status_code=400, detail="mode must be active|sold|both")
     return mode
 
+
 def serp_timeout() -> httpx.Timeout:
     return httpx.Timeout(connect=5.0, read=18.0, write=10.0, pool=5.0)
+
 
 async def serp_search(http: httpx.AsyncClient, *, q: str, sold: bool) -> dict:
     api_key = os.getenv("SERPAPI_API_KEY")
@@ -52,10 +52,12 @@ async def serp_search(http: httpx.AsyncClient, *, q: str, sold: bool) -> dict:
     r.raise_for_status()
     return r.json()
 
+
 def extract_items(serp_json: Optional[dict]) -> List[dict]:
     if not serp_json:
         return []
     return serp_json.get("organic_results") or []
+
 
 def attach_images_to_openai_content(
     content: List[Dict[str, Any]],
@@ -64,21 +66,15 @@ def attach_images_to_openai_content(
     extra_files: List[UploadFile],
     extra_bytes_list: List[bytes],
 ) -> None:
-    # main
     main_b64 = base64.b64encode(main_bytes).decode("utf-8")
     main_data_url = f"data:{main_image.content_type};base64,{main_b64}"
     content.append({"type": "input_image", "image_url": main_data_url})
 
-    # extras
     for f, b in zip(extra_files, extra_bytes_list):
         b64 = base64.b64encode(b).decode("utf-8")
         data_url = f"data:{f.content_type};base64,{b64}"
         content.append({"type": "input_image", "image_url": data_url})
 
-
-# -----------------------------
-# Pipeline steps
-# -----------------------------
 
 async def get_initial_query(
     *,
@@ -90,9 +86,8 @@ async def get_initial_query(
 ) -> Tuple[str, bool, Optional[dict]]:
     """
     Returns: (query, used_llm, extracted_json_if_any)
-    Current behavior preserved:
-      - if text provided -> query=text, used_llm=False
-      - else -> call OpenAI and use first extracted search query
+    - If text provided -> query=text, used_llm=False
+    - Else -> OpenAI -> first search query
     """
     if text and text.strip():
         return text.strip(), False, None
@@ -132,6 +127,7 @@ async def get_initial_query(
 
     return query, True, extracted
 
+
 async def maybe_fallback_to_llm_when_text_fails(
     *,
     original_text: Optional[str],
@@ -143,15 +139,12 @@ async def maybe_fallback_to_llm_when_text_fails(
 ) -> Optional[str]:
     """
     If user gave text but we couldn't refine confidently, generate a new query via LLM.
-    Returns new_query or None.
     """
     if not (original_text and original_text.strip()):
         return None
     if refined_query:
-        return None  # text succeeded enough
+        return None
 
-    # Call LLM for a better initial query (uses images + optional text)
-    # Reuse get_initial_query but force it down the LLM path by passing text=None
     llm_query, _used_llm, _extracted = await get_initial_query(
         text=None,
         main_image=main_image,
@@ -162,11 +155,7 @@ async def maybe_fallback_to_llm_when_text_fails(
     return llm_query
 
 
-async def fetch_initial_serp_results(
-    *,
-    query: str,
-    mode: str,
-) -> Tuple[Optional[dict], Optional[dict]]:
+async def fetch_initial_serp_results(*, query: str, mode: str) -> Tuple[Optional[dict], Optional[dict]]:
     timeout = serp_timeout()
     async with httpx.AsyncClient(timeout=timeout) as http:
         tasks = []
@@ -183,6 +172,7 @@ async def fetch_initial_serp_results(
         return None, results[0]
     return results[0], results[1]
 
+
 def rerank_initial_for_signal(
     *,
     active_items: List[dict],
@@ -195,14 +185,23 @@ def rerank_initial_for_signal(
 
     if mode in ("active", "both") and active_items:
         active_ranked = image_ranking.rerank_items_by_image_similarity(
-            active_items, main_vecs, threshold=RERANK_THRESHOLD, keep_top_k=TOPK_SIGNAL
+            active_items,
+            main_vecs,
+            threshold=SIMILARITY_MIN,
+            keep_top_k=None,
         )
+
     if mode in ("sold", "both") and sold_items:
         sold_ranked = image_ranking.rerank_items_by_image_similarity(
-            sold_items, main_vecs, threshold=RERANK_THRESHOLD, keep_top_k=TOPK_SIGNAL
+            sold_items,
+            main_vecs,
+            threshold=SIMILARITY_MIN,
+            keep_top_k=None,
         )
 
     return active_ranked, sold_ranked
+
+
 
 async def fetch_final_candidates(
     *,
@@ -211,7 +210,6 @@ async def fetch_final_candidates(
     initial_active_items: List[dict],
     initial_sold_items: List[dict],
 ) -> Dict[str, Any]:
-    # If refined query exists: requery (no embed/rerank), else return initial 50s
     if not refined_query:
         return {
             "active_top50": [output_builder.slim_item(it) for it in initial_active_items[:50]] if initial_active_items else [],
@@ -243,9 +241,6 @@ async def fetch_final_candidates(
         "sold_top50": [output_builder.slim_item(it) for it in sold_items_ref[:50]] if sold_items_ref else [],
     }
 
-# -----------------------------
-# Endpoint orchestrator
-# -----------------------------
 
 @app.post("/api/py/extract-file")
 async def extract_from_files(
@@ -253,6 +248,7 @@ async def extract_from_files(
     files: List[UploadFile] = File([]),
     text: Optional[str] = Form(None),
     mode: str = Form("active"),  # "active" | "sold" | "both"
+    include_debug: bool = Form(False),
 ):
     t0 = time.time()
     mode = normalize_mode(mode)
@@ -261,12 +257,10 @@ async def extract_from_files(
         # 1) Read images
         main_bytes, extra_bytes = await image_processing.read_images(main_image, files)
 
-        # 2) Embed main image early (needed regardless)
-        try:
-            main_vecs = await image_processing.embed_main_image(main_bytes)
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": f"Failed main image embedding: {str(e)}"})
+        # 2) Embed main image (always needed)
+        main_vecs = await image_processing.embed_main_image(main_bytes)
 
+        initial_time = time.time()
         # 3) Initial query (text-first else LLM)
         query, used_llm, _extracted = await get_initial_query(
             text=text,
@@ -275,21 +269,25 @@ async def extract_from_files(
             files=files,
             extra_bytes=extra_bytes,
         )
+        print("LLM: ", time.time() - initial_time)
 
         # 4) Initial Serp results
         serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
         active_items = extract_items(serp_active)
         sold_items = extract_items(serp_sold)
 
-        # 5) Embed small subset thumbnails (initial only)
+        initial_time = time.time()
+        # 5) Embed a small subset of thumbnails
         await image_processing.embed_initial_thumbnails_if_needed(active_items=active_items, sold_items=sold_items, mode=mode)
 
-        # 6) Rerank for signal + refining decision
+        # 6) Rerank for similarity signal
         active_ranked, sold_ranked = rerank_initial_for_signal(
             active_items=active_items, sold_items=sold_items, main_vecs=main_vecs, mode=mode
         )
+        print("Image embedding and reranking: ", time.time() - initial_time)
 
-        # 7) Refine query if confident
+        initial_time = time.time()
+        # 7) Refine query if confident (based on image similarity)
         refined_query = await query_refining.refine_query_if_confident(
             original_query=query,
             active_items=active_items,
@@ -297,7 +295,7 @@ async def extract_from_files(
             main_vecs=main_vecs,
         )
 
-        # 7.5) Optional: if text provided but no refinement, fallback to LLM initial query
+        # 7.5) If user text was weak (no refined_query), fallback to LLM
         fallback_llm_query = await maybe_fallback_to_llm_when_text_fails(
             original_text=text,
             refined_query=refined_query,
@@ -308,7 +306,6 @@ async def extract_from_files(
         )
 
         if fallback_llm_query:
-            # redo initial serp + thumbs + rerank + refinement, but now using llm_query
             query = fallback_llm_query
             used_llm = True
 
@@ -327,16 +324,16 @@ async def extract_from_files(
                 main_vecs=main_vecs,
             )
 
-
-        # 8) Final candidates: refined if exists else initial
+        # 8) Final candidates (refined if exists, else initial)
         final_candidates = await fetch_final_candidates(
             mode=mode,
             refined_query=refined_query,
             initial_active_items=active_items,
             initial_sold_items=sold_items,
         )
+        print("Refining search: ", time.time() - initial_time)
 
-        # 9) Strip heavy
+        # Strip heavy fields before returning
         if active_ranked and active_ranked.get("filtered_items"):
             output_builder.strip_heavy_fields(active_items, active_ranked["filtered_items"])
         else:
@@ -347,23 +344,38 @@ async def extract_from_files(
         else:
             output_builder.strip_heavy_fields(sold_items)
 
-        response = output_builder.build_response(
+        # ✅ Frontend-friendly payload ONLY
+        frontend = output_builder.build_frontend_payload(
             mode=mode,
-            main_vecs=main_vecs,
             initial_query=query,
             refined_query=refined_query,
             active_ranked=active_ranked,
             sold_ranked=sold_ranked,
-            final_candidates=final_candidates,
-            used_llm=used_llm,
         )
+        frontend["timing_sec"] = round(time.time() - t0, 3)
 
-        response["timing_sec"] = round(time.time() - t0, 3)
-        return JSONResponse(output_builder.json_sanitize(response))
+        # ✅ Debug payload on demand
+        if include_debug:
+            debug = output_builder.build_response(
+                mode=mode,
+                main_vecs=main_vecs,
+                initial_query=query,
+                refined_query=refined_query,
+                active_ranked=active_ranked,
+                sold_ranked=sold_ranked,
+                final_candidates=final_candidates,
+                used_llm=used_llm,
+            )
+            debug["timing_sec"] = frontend["timing_sec"]
+            return JSONResponse(output_builder.json_sanitize({"data": frontend, "debug": debug}))
+
+        return JSONResponse(output_builder.json_sanitize(frontend))
 
     except HTTPException as e:
-        # HTTPException.detail may be dict; keep it.
-        return JSONResponse(status_code=e.status_code, content=e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)})
+        return JSONResponse(
+            status_code=e.status_code,
+            content=e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)},
+        )
     except httpx.TimeoutException as e:
         return JSONResponse(status_code=504, content={"error": "Timeout during marketplace query", "detail": str(e)})
     except httpx.HTTPError as e:
