@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Optional
 import math
 import re
 
+TOPK_SIGNAL = 10
+
 def _parse_money_str(s: str) -> Optional[float]:
     if not isinstance(s, str):
         return None
@@ -199,3 +201,41 @@ def json_sanitize(obj: Any) -> Any:
     if isinstance(obj, (set, tuple)):
         return [json_sanitize(x) for x in obj]
     return str(obj)
+
+def top_signal_block(items_ranked: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not items_ranked:
+        return None
+    top = items_ranked.get("filtered_items") or []
+    return {
+        "summary": {k: v for k, v in items_ranked.items() if k != "filtered_items"},
+        "top_matches": [slim_item(it) for it in top[:TOPK_SIGNAL]],
+    }
+
+def strip_heavy_fields(*item_lists: List[dict]) -> None:
+    for items in item_lists:
+        if items:
+            _strip_heavy_fields(items)
+
+def build_response(
+    *,
+    mode: str,
+    main_vecs: List[List[float]],
+    initial_query: str,
+    refined_query: Optional[str],
+    active_ranked: Optional[Dict[str, Any]],
+    sold_ranked: Optional[Dict[str, Any]],
+    final_candidates: Dict[str, Any],
+    used_llm: bool,
+) -> Dict[str, Any]:
+    return {
+        "mode": mode,
+        "used_llm_for_initial_query": used_llm,
+        "main_embedding_dim": len(main_vecs[0]) if main_vecs else 0,
+        "initial_query": initial_query,
+        "refined_query": refined_query,
+        "initial_signal": {
+            "active": top_signal_block(active_ranked),
+            "sold": top_signal_block(sold_ranked),
+        },
+        "final_candidates": final_candidates,
+    }

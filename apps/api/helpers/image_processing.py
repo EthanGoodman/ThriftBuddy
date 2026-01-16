@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from fastapi import UploadFile
 import httpx
 from PIL import Image
 from io import BytesIO
@@ -16,6 +17,8 @@ _CLIP_MODEL = None
 _CLIP_PREPROCESS = None
 _CLIP_TOKENIZER = None
 _CLIP_DEVICE = "cpu"  # keep CPU for now (safe default)
+MAIN_CROPS = [1.0, 0.85]
+EMBED_MAX_INITIAL = 10
 
 def _load_clip():
     """
@@ -41,7 +44,35 @@ def _load_clip():
     _CLIP_PREPROCESS = preprocess
     return _CLIP_MODEL, _CLIP_PREPROCESS
 
+async def embed_initial_thumbnails_if_needed(
+    *,
+    active_items: List[dict],
+    sold_items: List[dict],
+    mode: str,
+) -> None:
+    if mode in ("active", "both") and active_items:
+        await embed_thumbnails_for_items(
+            active_items, max_items=EMBED_MAX_INITIAL, concurrency=THUMB_CONCURRENCY
+        )
+    if mode in ("sold", "both") and sold_items:
+        await embed_thumbnails_for_items(
+            sold_items, max_items=EMBED_MAX_INITIAL, concurrency=THUMB_CONCURRENCY
+        )
 
+async def read_images(
+    main_image: UploadFile,
+    files: List[UploadFile],
+) -> Tuple[bytes, List[bytes]]:
+    main_bytes = await main_image.read()
+    extra_bytes = []
+    for f in files:
+        extra_bytes.append(await f.read())
+    return main_bytes, extra_bytes
+
+async def embed_main_image(main_bytes: bytes) -> List[List[float]]:
+    return await image_bytes_to_embeddings_multicrop_async(
+        main_bytes, crops=MAIN_CROPS
+    )
 
 async def image_bytes_to_embeddings_multicrop_async(img_bytes: bytes, *, crops: List[float]) -> List[List[float]]:
     return await anyio.to_thread.run_sync(

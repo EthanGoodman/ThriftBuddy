@@ -8,6 +8,7 @@ _STOP = {
     "look","rare","wow","vintage","lot","bundle","sale","only","authentic","genuine",
     "with","and","the","a","an","in","of","for","to"
 }
+SIMILARITY_THRESHOLD = 0.65
 
 
 def extract_strong_tokens(title: str) -> List[str]:
@@ -57,8 +58,7 @@ async def maybe_refine_query_via_top_match(
     original_query: str,
     items: List[Dict[str, Any]],
     main_vecs: List[List[float]],
-    similarity_threshold: float = 0.35,
-    separation_threshold: float = 0.05,
+    similarity_threshold: float = 0.65,
 ) -> Optional[str]:
     """
     Returns a refined query string if confidence is high enough, else None.
@@ -91,3 +91,22 @@ async def maybe_refine_query_via_top_match(
         return None
 
     return refined
+
+async def refine_query_if_confident(
+    *,
+    original_query: str,
+    active_items: List[dict],
+    sold_items: List[dict],
+    main_vecs: List[List[float]],
+) -> Optional[str]:
+    # Same logic as before: prefer active for refinement, else sold.
+    source = active_items if active_items else sold_items
+    if not source:
+        return None
+
+    return await maybe_refine_query_via_top_match(
+        original_query=original_query,
+        items=source,
+        main_vecs=main_vecs,
+        similarity_threshold=SIMILARITY_THRESHOLD,
+    )
