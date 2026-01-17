@@ -18,3 +18,45 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* CLEAN, TRACKLESS SCROLLBAR */
+
+/* Chrome / Edge / Safari */
+.scrollbar-clean::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-clean::-webkit-scrollbar-track {
+  background: transparent; /* removes the box */
+}
+
+.scrollbar-clean::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Light mode thumb */
+:root .scrollbar-clean::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.25); /* slate-500-ish */
+}
+
+/* Dark mode thumb */
+.dark .scrollbar-clean::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.22); /* slate-400-ish */
+}
+
+/* Hover states */
+.scrollbar-clean::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.45);
+}
+
+/* Firefox */
+.scrollbar-clean {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.dark .scrollbar-clean {
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}

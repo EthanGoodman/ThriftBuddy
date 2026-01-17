@@ -119,8 +119,6 @@ def build_response(
         "final_candidates": final_candidates,
     }
 
-TOPK_SIGNAL = 10
-
 def _parse_money_str(s: str) -> Optional[float]:
     if not isinstance(s, str):
         return None
@@ -318,8 +316,8 @@ def build_frontend_payload(
     active_n = len(active_matches)
     sold_n = len(sold_matches)
 
-    example_items = (sold_matches[:3] + active_matches)[:5]
-    examples = _pick_example_listings(example_items, k=5)
+    example_items = (sold_matches + active_matches)
+    examples = _pick_example_listings(example_items, k=50)
 
     category = _infer_category_hint(refined_query or initial_query, examples)
     advice = _legit_advice(category)

@@ -9,8 +9,7 @@ import os
 import asyncio
 import time
 
-import common
-from helpers import image_processing, image_ranking, query_refining, output_builder
+from helpers import image_processing, image_ranking, query_refining, output_builder, LLM_Helper
 
 app = FastAPI()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -18,8 +17,6 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
 # For stats: keep anything above this similarity
 SIMILARITY_MIN = 0.55
-# For display: show top N matches (output_builder already uses 10)
-DISPLAY_TOPK = 10
 SEPARATION_THRESHOLD = 0.05
 
 
@@ -92,7 +89,7 @@ async def get_initial_query(
     if text and text.strip():
         return text.strip(), False, None
 
-    content: List[Dict[str, Any]] = [{"type": "input_text", "text": common.EXTRACTION_PROMPT}]
+    content: List[Dict[str, Any]] = [{"type": "input_text", "text": LLM_Helper.EXTRACTION_PROMPT}]
     attach_images_to_openai_content(content, main_image, main_bytes, files, extra_bytes)
 
     resp = openai_client.responses.create(
@@ -110,15 +107,8 @@ async def get_initial_query(
             detail={"error": "LLM did not return valid JSON", "raw_result": raw_text},
         )
 
-    search_queries = extracted.get("search_queries") or []
-    if not isinstance(search_queries, list) or not search_queries:
-        raise HTTPException(
-            status_code=502,
-            detail={"error": "No search_queries returned by LLM", "extracted": extracted},
-        )
+    query = extracted.get("query") or None
 
-    chosen = search_queries[0] if isinstance(search_queries[0], dict) else None
-    query = chosen.get("query") if chosen else None
     if not query:
         raise HTTPException(
             status_code=502,
