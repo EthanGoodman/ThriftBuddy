@@ -344,7 +344,12 @@ export default function MyNextFastAPIApp() {
           {data.example_listings?.length ? (
             <div className="max-h-[280px] overflow-y-auto scrollbar-clean [scrollbar-gutter:stable] pr-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {data.example_listings.slice(0, 51).map((it, idx) => (
+                {data.example_listings
+                  .filter(it => it.price?.extracted != null)
+                  .sort((a, b) => a.price.extracted - b.price.extracted)
+                  .slice(0, 51)
+                  .map((it, idx) => (
+
                   <a
                     key={(it.product_id ?? "") + idx}
                     href={it.link || "#"}
@@ -405,14 +410,31 @@ export default function MyNextFastAPIApp() {
               <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 <span className="text-blue-700 dark:text-blue-400">Thrift</span>Buddy
               </h1>
-              <button
+             <button
                 type="button"
                 onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50
-                          dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                className={[
+                  "relative inline-flex h-7 w-[64px] items-center rounded-full border shadow-sm transition",
+                  "border-slate-300 bg-white hover:bg-slate-50",
+                  "dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
+                ].join(" ")}
               >
-                {theme === "dark" ? "Light mode" : "Dark mode"}
+                {/* icons */}
+                <span className="absolute left-2 text-xs select-none">🌙</span>
+                <span className="absolute right-2 text-xs select-none">☀️</span>
+
+                {/* thumb */}
+                <span
+                  className={[
+                    "absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full shadow transition-transform",
+                    "bg-slate-900 dark:bg-white",
+                    theme === "dark" ? "translate-x-[4px]" : "translate-x-[36px]",
+                  ].join(" ")}
+                />
               </button>
+
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4
                 dark:border-slate-800 dark:bg-slate-950/40">
