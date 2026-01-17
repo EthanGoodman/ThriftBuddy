@@ -346,7 +346,7 @@ export default function MyNextFastAPIApp() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {data.example_listings
                   .filter(it => it.price?.extracted != null)
-                  .sort((a, b) => a.price.extracted - b.price.extracted)
+                  .sort((a, b) => a.price?.extracted! - b.price?.extracted!)
                   .slice(0, 51)
                   .map((it, idx) => (
 
