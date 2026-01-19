@@ -62,10 +62,14 @@ This layered approach intentionally mixes **LLM reasoning** with **embedding-bas
 
 
 ## 📂 Project Structure
+
+```
 thrift-buddy/
 └── apps/
-├── api/ # FastAPI backend (LLM + CLIP + marketplace querying)
-└── web/ # Next.js frontend (upload UI, results, insights)
+    ├── api/   # FastAPI backend (LLM + CLIP + marketplace querying)
+    └── web/   # Next.js frontend (upload UI, results, insights)
+```
+
 
 ---
 
