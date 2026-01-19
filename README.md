@@ -3,7 +3,9 @@
 
 ThriftBuddy is a full-stack AI project I built to help resellers and thrifters identify items from photos and understand their resale potential. You upload images (and optional text), and ThriftBuddy combines multimodal AI, image similarity, and marketplace data to generate pricing insights and strong resale hypotheses.
 
-This project has been *a lot* of fun to build. It started as curiosity around “how do people actually identify items when thrifting?” and turned into a hands-on exploration of AI systems, ML pipelines, and real-world data messiness.
+This project has been *a lot* of fun to build. I made ThriftBuddy because I love thrifting and I kept running into the same problem. Google image search is great for finding out what something may be, but it doesn't give targeted resale pricing information or real demand signals. I found it mostly surfaces random listings, making it hard for me to identify resale value for items.
+
+I wanted something that could take a photo of an item, figure out what it likely is, search marketplaces for the item, and provide me with targeted information that would help me determine whether I should buy the item. Building this system was so much fun and turned into a hands on exploration of AI pipelines, image similarity, and the messy reality of marketplace data.
 
 ---
 
