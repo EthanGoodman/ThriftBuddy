@@ -56,7 +56,7 @@ This layered approach intentionally mixes **LLM reasoning** with **embedding-bas
 ### Data & Infrastructure
 - PostgreSQL
 - Marketplace APIs (e.g., eBay via SerpAPI)
-- Cloud deployment (Render)
+- Cloud deployment (Vercel, Render)
 
 ---
 
