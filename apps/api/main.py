@@ -18,6 +18,9 @@ SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
 # For stats: keep anything above this similarity
 SIMILARITY_MIN = 0.55
 SEPARATION_THRESHOLD = 0.05
+FINAL_SIMILARITY_MIN = 0.68  # stricter than SIMILARITY_MIN
+FINAL_KEEP_TOP_K = 25        # optional: return fewer, higher quality
+
 
 
 @app.on_event("startup")
@@ -199,12 +202,29 @@ async def fetch_final_candidates(
     refined_query: Optional[str],
     initial_active_items: List[dict],
     initial_sold_items: List[dict],
+    main_vecs: List[List[float]],
 ) -> Dict[str, Any]:
     if not refined_query:
+        # build ranked view from initial results so shapes match
+        active_ranked_final = None
+        sold_ranked_final = None
+
+        if mode in ("active", "both") and initial_active_items:
+            active_ranked_final = image_ranking.rerank_items_by_image_similarity(
+                initial_active_items, main_vecs, threshold=FINAL_SIMILARITY_MIN, keep_top_k=FINAL_KEEP_TOP_K
+            )
+        if mode in ("sold", "both") and initial_sold_items:
+            sold_ranked_final = image_ranking.rerank_items_by_image_similarity(
+                initial_sold_items, main_vecs, threshold=FINAL_SIMILARITY_MIN, keep_top_k=FINAL_KEEP_TOP_K
+            )
+
         return {
-            "active_top50": [output_builder.slim_item(it) for it in initial_active_items[:50]] if initial_active_items else [],
-            "sold_top50": [output_builder.slim_item(it) for it in initial_sold_items[:50]] if initial_sold_items else [],
+            "active_ranked": active_ranked_final,
+            "sold_ranked": sold_ranked_final,
+            "active_items_ref": initial_active_items,
+            "sold_items_ref": initial_sold_items,
         }
+
 
     timeout = serp_timeout()
     async with httpx.AsyncClient(timeout=timeout) as http:
@@ -226,10 +246,37 @@ async def fetch_final_candidates(
     active_items_ref = extract_items(serp_active_ref)
     sold_items_ref = extract_items(serp_sold_ref)
 
+    if mode in ("active", "both") and active_items_ref:
+        await image_processing.embed_thumbnails_for_items(active_items_ref, max_items=50, concurrency=image_processing.THUMB_CONCURRENCY)
+        active_ranked_final = image_ranking.rerank_items_by_image_similarity(
+            active_items_ref,
+            main_vecs,
+            threshold=FINAL_SIMILARITY_MIN,
+            keep_top_k=FINAL_KEEP_TOP_K,
+        )
+        active_filtered = active_ranked_final["filtered_items"]
+    else:
+        active_filtered = []
+
+    if mode in ("sold", "both") and sold_items_ref:
+        await image_processing.embed_thumbnails_for_items(sold_items_ref, max_items=50, concurrency=image_processing.THUMB_CONCURRENCY)
+        sold_ranked_final = image_ranking.rerank_items_by_image_similarity(
+            sold_items_ref,
+            main_vecs,
+            threshold=FINAL_SIMILARITY_MIN,
+            keep_top_k=FINAL_KEEP_TOP_K,
+        )
+        sold_filtered = sold_ranked_final["filtered_items"]
+    else:
+        sold_filtered = []
+
     return {
-        "active_top50": [output_builder.slim_item(it) for it in active_items_ref[:50]] if active_items_ref else [],
-        "sold_top50": [output_builder.slim_item(it) for it in sold_items_ref[:50]] if sold_items_ref else [],
+        "active_ranked": active_ranked_final if mode in ("active", "both") else None,
+        "sold_ranked": sold_ranked_final if mode in ("sold", "both") else None,
+        "active_items_ref": active_items_ref,
+        "sold_items_ref": sold_items_ref,
     }
+
 
 
 @app.post("/api/py/extract-file")
@@ -320,7 +367,15 @@ async def extract_from_files(
             refined_query=refined_query,
             initial_active_items=active_items,
             initial_sold_items=sold_items,
+            main_vecs=main_vecs,
         )
+
+        if refined_query:
+            active_ranked = final_candidates.get("active_ranked") or active_ranked
+            sold_ranked = final_candidates.get("sold_ranked") or sold_ranked
+            active_items = final_candidates.get("active_items_ref") or active_items
+            sold_items = final_candidates.get("sold_items_ref") or sold_items
+
         print("Refining search: ", time.time() - initial_time)
 
         # Strip heavy fields before returning
@@ -344,6 +399,8 @@ async def extract_from_files(
         )
         frontend["timing_sec"] = round(time.time() - t0, 3)
 
+        include_debug = True
+
         # ✅ Debug payload on demand
         if include_debug:
             debug = output_builder.build_response(
@@ -357,6 +414,7 @@ async def extract_from_files(
                 used_llm=used_llm,
             )
             debug["timing_sec"] = frontend["timing_sec"]
+            print(output_builder.json_sanitize({"data": frontend, "debug": debug}))
             return JSONResponse(output_builder.json_sanitize({"data": frontend, "debug": debug}))
 
         return JSONResponse(output_builder.json_sanitize(frontend))
