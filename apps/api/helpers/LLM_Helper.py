@@ -11,6 +11,7 @@ STRICT RULES (MUST FOLLOW):
 IDENTIFICATION RULES:
 - The image is the source of truth. User text is a hint only.
 - DO NOT invent brand, model, or year unless visible text confirms it.
+- If the item appears to be clothing, try and identify the specific color of the ite,.
 - If a distinctive mechanism or material is visible, include it
   (e.g., "eject", "teak", "push button").
 - Prefer common eBay wording over technical jargon.
