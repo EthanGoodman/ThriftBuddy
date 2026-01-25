@@ -173,7 +173,26 @@ function StepColumn({
                   ].join(" ")}
                   aria-hidden="true"
                 >
-                  {isActive ? "•" : "✓"}
+                  {isActive ? (<svg
+                        width="6"
+                        height="6"
+                        viewBox="0 0 6 6"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                      >
+                        <circle cx="3" cy="3" r="2" fill="currentColor" />
+                      </svg> )
+                  : (<svg width="10" height="10" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M2 6.5L4.5 9L10 3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  )}
                 </span>
 
                 <span
@@ -232,9 +251,15 @@ function CheckboxChip({
       className={[
         "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition",
         "border shadow-sm",
-        checked
-          ? "bg-blue-600/20 border-blue-400/40 text-slate-100"
-          : "bg-white/5 border-white/10 text-slate-200 hover:bg-white/10",
+        !checked
+          ? [
+              "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+              "dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-800 dark:hover:bg-slate-800/60",
+            ].join(" ")
+          : [
+              "bg-blue-600/10 text-slate-900 border-blue-500/30 hover:bg-blue-600/15",
+              "dark:bg-blue-600/20 dark:text-slate-100 dark:border-blue-400/40 dark:hover:bg-blue-600/25",
+            ].join(" "),
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
         disabled ? "opacity-60 cursor-not-allowed" : "",
       ].join(" ")}
@@ -246,7 +271,7 @@ function CheckboxChip({
           "grid place-items-center h-5 w-5 rounded-md border transition",
           checked
             ? "bg-blue-500 border-blue-400/60"
-            : "bg-transparent border-white/20",
+            : "bg-transparent border-slate-300 dark:border-white/20",
         ].join(" ")}
         aria-hidden="true"
       >
@@ -1220,7 +1245,7 @@ export default function MyNextFastAPIApp() {
                 <>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2
                     dark:border-slate-800 dark:bg-slate-950/40">
-                    <div className="flex justify-between font-semibold">
+                    <div className="flex justify-between font-semibold text-slate-900 dark:text-slate-100">
                       Search Parameters
                     </div>
                     <div className="flex items-start justify-between gap-3">
@@ -1343,13 +1368,13 @@ export default function MyNextFastAPIApp() {
                   {/* show errors (keep them separate, still useful) */}
                   {activeError ? (
                     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                      Active: {activeError}
+                     {activeError}
                     </div>
                   ) : null}
 
                   {soldError ? (
                     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                      Sold: {soldError}
+                      {soldError}
                     </div>
                   ) : null}
 
