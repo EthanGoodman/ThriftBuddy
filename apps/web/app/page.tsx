@@ -56,10 +56,6 @@ type ApiResponse =
   | FrontendPayload
   | { data: FrontendPayload; debug?: any }; // backend may wrap, we ignore debug here
 
-function isWrappedResponse(x: any): x is { data: FrontendPayload; debug?: any } {
-  return x && typeof x === "object" && "data" in x;
-}
-
 function fmtMoney(x: number | null | undefined) {
   if (x == null || Number.isNaN(x)) return "—";
   return `$${x.toFixed(2)}`;
