@@ -1085,14 +1085,8 @@ export default function MyNextFastAPIApp() {
       <div className="mx-auto w-full max-w-6xl">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-6 items-start">
           {/* LEFT */}
-          <div className="relative flex flex-col gap-6">
-            
-            {/* subtle anchor glow */}
-            <div className="pointer-events-none absolute -inset-40 rounded-full bg-blue-500/[0.015] blur-[180px]" />
-
-            {/* MAIN APP CARD */}
-            <div className="relative rounded-2xl bg-white p-6 shadow-md ring-1 ring-black/5 space-y-5 dark:bg-slate-900 dark:ring-white/10">
-
+          <div className="flex flex-col gap-6">
+            <div className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-black/5 space-y-5 dark:bg-slate-900 dark:ring-white/10">
               <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                   <span className="text-blue-700 dark:text-blue-400">Thrift</span>Buddy
@@ -1123,30 +1117,6 @@ export default function MyNextFastAPIApp() {
                         Collapse Form
                     </button>
                 ))}
-                  <button
-                    type="button"
-                    onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-                    aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                    className={[
-                      "relative inline-flex h-7 w-[64px] items-center rounded-full border shadow-sm transition",
-                      "border-slate-300 bg-white hover:bg-slate-50",
-                      "dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
-                    ].join(" ")}
-                  >
-                    {/* icons */}
-                    <span className="absolute left-2 text-xs select-none">🌙</span>
-                    <span className="absolute right-2 text-xs select-none">☀️</span>
-
-                    {/* thumb */}
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full shadow transition-transform",
-                        "bg-slate-900 dark:bg-white",
-                        theme === "dark" ? "translate-x-[4px]" : "translate-x-[36px]",
-                      ].join(" ")}
-                    />
-                  </button>
                 </div>
               </div>
               {!collapseForm && (

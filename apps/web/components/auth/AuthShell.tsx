@@ -62,11 +62,6 @@ export default function AuthShell({
       </div>
 
       <div className="relative mx-auto w-full max-w-7xl px-8">
-        {/* top row */}
-        <div className="pt-6 flex items-center justify-between">
-          <div className="text-sm text-slate-300/70">{subtitle}</div>
-          <ThemeToggle theme={theme} setTheme={setTheme} />
-        </div>
 
         {/* center stage */}
         <div className="min-h-[calc(100vh-96px)] grid items-center">{children}</div>

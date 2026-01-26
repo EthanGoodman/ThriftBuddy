@@ -61,6 +61,7 @@ function Spinner() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -81,12 +82,31 @@ export default function LoginPage() {
     e.preventDefault();
     setErr(null);
 
-    // TODO: wire to backend /auth/login once you create it
+    if (!API) {
+      setErr("Missing NEXT_PUBLIC_API_BASE_URL in .env.local");
+      return;
+    }
     setLoading(true);
     try {
-      // placeholder behavior: route into app
-      await new Promise((r) => setTimeout(r, 450));
-      router.push("/app");
+      const resp = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: pw,
+        }),
+      });
+
+      if (resp.status === 401) {
+        setErr("Invalid Credentials");
+        return;
+      }
+      if (!resp.ok) {
+        const text = await resp.text();
+        setErr(`Login failed (${resp.status}). ${text}`);
+        return;
+      }
+      router.push("/app")
     } catch (e: any) {
       setErr("Login failed. Please try again.");
     } finally {
@@ -134,7 +154,6 @@ export default function LoginPage() {
               <div className="flex items-start justify-between gap-4 mb-6">
                 <div>
                   <div className="text-base font-semibold text-slate-100">Sign in</div>
-                  <div className="text-sm text-slate-400">Email + password (OAuth later).</div>
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10">

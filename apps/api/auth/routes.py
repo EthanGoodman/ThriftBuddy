@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from db.models import User
-from helpers.passwords import hash_password
+from helpers.passwords import hash_password, verify_password
+
+from datetime import datetime, timedelta
+import os
+import jwt
+
+
 
 router = APIRouter()
 
@@ -27,10 +33,32 @@ class UserOut(BaseModel):
     email_verified: bool
     created_at: str
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 
 # ---------- Helpers ----------
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+def create_access_token(*, user_id: str, email: str) -> str:
+    secret = os.getenv("JWT_SECRET", "dev-secret-change-me")
+    exp_minutes = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "exp": datetime.utcnow() + timedelta(minutes=exp_minutes),
+        "iat": datetime.utcnow(),
+    }
+    return jwt.encode(payload, secret, algorithm="HS256")
+
 
 
 # ---------- Route ----------
@@ -89,3 +117,39 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> UserOut
         email_verified=bool(user.email_verified),
         created_at=user.created_at.isoformat() if hasattr(user.created_at, "isoformat") else str(user.created_at),
     )
+
+@router.post("/login", response_model=LoginResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+    email_norm = normalize_email(payload.email)
+
+    user = (
+        db.query(User)
+        .filter(text("email_normalized = :e"))
+        .params(e=email_norm)
+        .first()
+    )
+
+    # Don't reveal whether the email exists
+    if not user or not user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+
+    try:
+        if hasattr(user, "last_login_at"):
+            user.last_login_at = datetime.utcnow()
+            db.add(user)
+            db.commit()
+    except Exception:
+        db.rollback()
+
+    token = create_access_token(user_id=str(user.id), email=user.email)
+    return LoginResponse(access_token=token)
+

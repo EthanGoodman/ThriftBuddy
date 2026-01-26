@@ -121,7 +121,7 @@ export default function RegisterPage() {
       }
 
       setOk("Account created. Redirecting to login…");
-      setTimeout(() => router.push("/login"), 650);
+      router.push("/login")
     } catch (e: any) {
       setErr("Network error. Is the FastAPI server running?");
     } finally {

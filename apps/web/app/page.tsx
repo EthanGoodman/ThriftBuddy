@@ -250,14 +250,6 @@ export default function LandingPage() {
 
       {/* Content wrapper */}
       <div className="relative mx-auto w-full max-w-7xl px-8">
-        {/* Top controls (overlay, not pushing layout down) */}
-        <div className="pt-6 flex items-center justify-between">
-          <div className="text-sm text-slate-300/70">
-            Minimal · calm · built for resale research
-          </div>
-          <ThemeToggle theme={theme} setTheme={setTheme} />
-        </div>
-
         {/* Hero section: vertically centered */}
         <div className="min-h-[calc(100vh-120px)] grid items-center">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
