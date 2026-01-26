@@ -149,7 +149,7 @@ function DemoSteps() {
   useEffect(() => {
     const t = setInterval(() => {
       setActiveIdx((i) => (i + 1) % DEMO_STEPS.length);
-    }, 2600);
+    }, 4000);
     return () => clearInterval(t);
   }, []);
 
@@ -176,7 +176,7 @@ function DemoSteps() {
                   "grid place-items-center h-5 w-5 rounded-full border text-xs shrink-0",
                   "bg-white/[0.02]",
                   isActive
-                    ? "border-blue-400/70 text-blue-400 animate-[softPulse_2.8s_ease-in-out_infinite]"
+                    ? "border-blue-400/70 text-blue-400 animate-[softPulse_1.8s_ease-in-out_infinite]"
                     : isDone
                       ? "border-emerald-400/70 text-emerald-400"
                       : "border-white/10 text-slate-500",
@@ -190,7 +190,7 @@ function DemoSteps() {
                 className={[
                   "text-sm",
                   isActive
-                    ? "text-slate-200 animate-[softPulseText_2.8s_ease-in-out_infinite]"
+                    ? "text-slate-200 animate-[softPulseText_1.8s_ease-in-out_infinite]"
                     : isDone
                       ? "text-slate-200/90"
                       : "text-slate-400/80",
