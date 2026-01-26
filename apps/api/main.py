@@ -10,8 +10,24 @@ import asyncio
 import time
 
 from helpers import image_processing, image_ranking, query_refining, output_builder, LLM_Helper
+from auth.routes import router as auth_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"

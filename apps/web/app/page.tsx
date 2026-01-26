@@ -308,7 +308,7 @@ export default function LandingPage() {
                     <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl opacity-70" />
                     <button
                       type="button"
-                      onClick={() => router.push("/app")}
+                      onClick={() => router.push("/login")}
                       className="relative w-full rounded-2xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-400 transition"
                     >
                       Login
@@ -319,7 +319,7 @@ export default function LandingPage() {
                   <div className="mt-4">
                     <button
                       type="button"
-                      onClick={() => router.push("/app")}
+                      onClick={() => router.push("/register")}
                       className="w-full rounded-2xl bg-white/[0.02] px-5 py-3 text-sm font-semibold text-slate-200 ring-1 ring-white/10 hover:bg-white/[0.05] transition"
                     >
                       Create account <span className="text-blue-300">Get started</span>
