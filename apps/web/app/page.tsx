@@ -1356,24 +1356,17 @@ export default function MyNextFastAPIApp() {
                     : "Run"
                   }
                 </button>
+                {/* show errors (keep them separate, still useful) */}
+                  {activeError || soldError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                     {activeError || soldError}
+                    </div>
+                  ) : null}
               </div>
             </div>
             <div className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-black/5 space-y-5 dark:bg-slate-900 dark:ring-white/10">
               {/* RESULTS */}
                 <div className="space-y-4">
-                  {/* show errors (keep them separate, still useful) */}
-                  {activeError ? (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                     {activeError}
-                    </div>
-                  ) : null}
-
-                  {soldError ? (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                      {soldError}
-                    </div>
-                  ) : null}
-
                   {/* pick whichever payload exists to populate the combined cards */}
                   {combinedData && !anyBusy ? (
                     <ResultsCards data={combinedData!} />
