@@ -357,25 +357,7 @@ export default function LandingPage() {
                           onClick={() => router.push("/register")}
                           className="w-full rounded-2xl bg-white/[0.02] px-5 py-3 text-sm font-semibold text-slate-200 ring-1 ring-white/10 hover:bg-white/[0.05] transition"
                         >
-                          Create account <span className="text-blue-300">Get started</span>
-                        </button>
-                      </div>
-
-                      {/* Demo */}
-                      <div className="mt-6">
-                        <button
-                          type="button"
-                          onClick={() => router.push("/app")}
-                          className="group w-full rounded-2xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/[0.03] ring-1 ring-transparent hover:ring-white/10 transition"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-400">Try it without signing in</span>
-                            <span className="inline-flex items-center gap-2 text-blue-300">
-                              Open demo
-                              <span className="transition-transform group-hover:translate-x-0.5">→</span>
-                            </span>
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">Uses sample mode — no account required.</div>
+                          Create account <span className="text-blue-300">Start free</span>
                         </button>
                       </div>
                     </div>

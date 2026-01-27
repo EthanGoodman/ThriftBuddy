@@ -93,7 +93,7 @@ export default function AppHeader() {
               {/* Right: actions */}
               <div className="flex items-center gap-3">
                 <div className="hidden md:block text-xs text-slate-500/80 dark:text-slate-400/70">
-                  Minimal · calm · built for resale research
+                  minimal · calm · built for resale research
                 </div>
                 {!isLanding && (
                   <ThemeToggle theme={theme} setTheme={setTheme} />
