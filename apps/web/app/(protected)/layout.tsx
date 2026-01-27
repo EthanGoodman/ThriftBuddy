@@ -26,14 +26,13 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
 
   console.log(token)
 
-  if (!token) redirect("/login");
+  if (!token) redirect("/");
 
   try {
     await verifyAccessToken(token);
     return <>{children}</>;
   } catch (e) {
-    console.log("the error:", e)
     // expired / invalid / wrong secret
-    redirect("/login");
+    redirect("/");
   }
 }
