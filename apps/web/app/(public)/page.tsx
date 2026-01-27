@@ -8,11 +8,11 @@ import { useAuth } from "@/components/auth/useAuth";
 type Theme = "dark" | "light";
 
 const DEMO_STEPS = [
-  "Identifying item",
-  "Querying marketplaces",
-  "Processing images",
-  "Refining search query",
-  "Re-querying marketplaces",
+  "Identifying the item",
+  "Searching marketplaces",
+  "Analyzing marketplace images",
+  "Improving the search",
+  "Finding better matches",
 ] as const;
 
 function CheckIcon() {

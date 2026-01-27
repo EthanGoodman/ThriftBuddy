@@ -419,11 +419,11 @@ type ErrorEvent = {
 type StreamEvent = StepEvent | ResultEvent | ErrorEvent;
 
 const STREAM_STEPS = [
-  { id: "gen_query", label: "Identifying Item" },
-  { id: "query_mkt", label: "Querying marketplaces" },
-  { id: "proc_imgs", label: "Processing item images" },
-  { id: "refine", label: "Refining search query" },
-  { id: "requery", label: "Re-querying marketplaces" },
+  { id: "gen_query", label: "Identifying the item" },
+  { id: "query_mkt", label: "Searching marketplaces" },
+  { id: "proc_imgs", label: "Analyzing marketplace images" },
+  { id: "refine", label: "Improving the search" },
+  { id: "requery", label: "Finding better matches" },
 ] as const;
 
 
