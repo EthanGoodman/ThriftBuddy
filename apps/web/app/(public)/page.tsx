@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthPanel from "@/components/auth/AuthPanel"
+import { useAuth } from "@/components/auth/useAuth";
 
 type Theme = "dark" | "light";
 
@@ -223,12 +224,11 @@ function DemoSteps() {
 export default function LandingPage() {
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL!;
+  const { isAuthed } = useAuth(API);
 
   const [theme, setTheme] = useState<Theme>("dark");
 
-  const [isAuthed, setIsAuthed] = useState<boolean | null>(null); // null = checking
-
-
+  
   // load saved theme once (default dark)
   useEffect(() => {
     const saved = (localStorage.getItem("tb_theme") as Theme | null) ?? "dark";
@@ -242,41 +242,6 @@ export default function LandingPage() {
     else root.classList.remove("dark");
     localStorage.setItem("tb_theme", theme);
   }, [theme]);
-
-  useEffect(() => {
-    let alive = true;
-
-    async function checkMe() {
-      try {
-        const resp = await fetch(`${API}/auth/me`, {
-          method: "GET",
-          credentials: "include",
-        });
-        if (!alive) return;
-        setIsAuthed(resp.ok);
-      } catch {
-        if (!alive) return;
-        setIsAuthed(false);
-      }
-    }
-
-    checkMe();
-    return () => {
-      alive = false;
-    };
-  }, [API]);
-
-  async function logout() {
-    try {
-      await fetch(`${API}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } finally {
-      setIsAuthed(false);
-    }
-  }
-
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
