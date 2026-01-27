@@ -261,9 +261,9 @@ export default function LandingPage() {
             {/* LEFT */}
             <div className="max-w-xl">
               <h1 className="text-6xl md:text-7xl font-semibold tracking-tight text-slate-100">
-                <span className="text-blue-400">Thrift</span>Buddy
+                <span className="text-blue-400"> Understand true {" "}</span>
+                  resale value
               </h1>
-
               {/* Replaces the paragraph */}
               <TypeLine />
 
@@ -299,7 +299,7 @@ export default function LandingPage() {
                             <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50 animate-ping" />
                             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
                           </span>
-                          demo enabled
+                          partial access
                         </div>
                       </div>
 

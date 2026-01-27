@@ -24,15 +24,12 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
 
-  console.log(token)
-
   if (!token) redirect("/");
 
   try {
     await verifyAccessToken(token);
     return <>{children}</>;
   } catch (e) {
-    // expired / invalid / wrong secret
     redirect("/");
   }
 }

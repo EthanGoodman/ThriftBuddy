@@ -158,10 +158,10 @@ export default function RegisterPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
         {/* Left */}
         <div className="max-w-xl">
-          <h1 className="text-6xl md:text-6xl font-semibold tracking-tight text-slate-100">
-            <span className="text-blue-400">Thrift</span>Buddy
+          <h1 className="text-6xl md:text-7xl font-semibold tracking-tight text-slate-100">
+            <span className="text-blue-400"> Understand true {" "}</span>
+              resale value
           </h1>
-
           <div className="mt-4 text-lg text-slate-300 leading-relaxed">
             Create your account to save comps, notes, and previous runs.
           </div>
@@ -194,7 +194,6 @@ export default function RegisterPage() {
                 <div className="relative">
                   <div className="mb-6">
                     <div className="text-base font-semibold text-slate-100">Create account</div>
-                    <div className="text-sm text-slate-400">Email + password for now. OAuth next.</div>
                   </div>
 
                   <form onSubmit={onSubmit} className="space-y-5">

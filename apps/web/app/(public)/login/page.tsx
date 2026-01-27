@@ -145,10 +145,10 @@ export default function LoginPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
         {/* Left: brand + reassurance */}
         <div className="max-w-xl">
-          <h1 className="text-6xl md:text-6xl font-semibold tracking-tight text-slate-100">
-            <span className="text-blue-400">Thrift</span>Buddy
+          <h1 className="text-6xl md:text-7xl font-semibold tracking-tight text-slate-100">
+            <span className="text-blue-400"> Understand true {" "}</span>
+              resale value
           </h1>
-
           <div className="mt-4 text-lg text-slate-300 leading-relaxed">
             Welcome back. Pick up where you left off — comps, notes, and your latest runs.
           </div>
@@ -190,7 +190,7 @@ export default function LoginPage() {
                       <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50 animate-ping" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
                     </span>
-                    demo available
+                    partial access
                   </div>
                 </div>
 

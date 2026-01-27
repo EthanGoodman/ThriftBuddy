@@ -16,6 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
+from dotenv import load_dotenv
+load_dotenv() 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
