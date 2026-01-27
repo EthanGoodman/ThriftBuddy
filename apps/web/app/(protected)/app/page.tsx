@@ -974,9 +974,8 @@ export default function MyNextFastAPIApp() {
   }) {
     return (
       <div
-        className="group relative aspect-square overflow-hidden rounded-lg
-                  border border-slate-800
-                  bg-transparent"
+        className=" border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/40 
+        group relative aspect-square overflow-hidden rounded-lg bg-transparent"
         title="Click to enlarge"
       >
         <button type="button" onClick={onOpen} className="absolute inset-0">
