@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useState } from "react";
-import { Card } from "@/app/app/page"
+import { Card } from "@/app/(protected)/app/page"
 
 
 const UTILITY_BTN_CLASS =

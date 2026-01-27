@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/useAuth"
 
 type Theme = "dark" | "light";
 
@@ -34,11 +35,12 @@ function ThemeToggle({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) =
 export default function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const isLanding = pathname === "/" || pathname === "/login" || pathname === "/register";
 
   const [theme, setTheme] = useState<Theme>("dark");
-  const [isAuthed, setIsAuthed] = useState(false);
+  const { isAuthed, logout } = useAuth(API);
 
   useEffect(() => {
     const saved = (localStorage.getItem("tb_theme") as Theme | null) ?? "dark";
@@ -51,16 +53,6 @@ export default function AppHeader() {
     else root.classList.remove("dark");
     localStorage.setItem("tb_theme", theme);
   }, [theme]);
-
-  useEffect(() => {
-    setIsAuthed(Boolean(localStorage.getItem("tb_token")));
-  }, [pathname]);
-
-  function logout() {
-    localStorage.removeItem("tb_token");
-    setIsAuthed(false);
-    router.push("/");
-  }
 
   const onAuthPages = pathname === "/login" || pathname === "/register";
 

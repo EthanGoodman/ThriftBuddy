@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileUploadCard } from "@/components/file-upload";
 import { MultiFileUploadCard } from "@/components/multi-file-upload";
 import { FullscreenCard } from "@/components/full-screen-modal";
-import { text } from "stream/consumers";
 
 type Preview = {
   key: string;

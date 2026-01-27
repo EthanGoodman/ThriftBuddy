@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import AuthPanel from "@/components/auth/AuthPanel"
 
 type Theme = "dark" | "light";
 
@@ -221,8 +222,12 @@ function DemoSteps() {
 
 export default function LandingPage() {
   const router = useRouter();
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
   const [theme, setTheme] = useState<Theme>("dark");
+
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null); // null = checking
+
 
   // load saved theme once (default dark)
   useEffect(() => {
@@ -237,6 +242,41 @@ export default function LandingPage() {
     else root.classList.remove("dark");
     localStorage.setItem("tb_theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function checkMe() {
+      try {
+        const resp = await fetch(`${API}/auth/me`, {
+          method: "GET",
+          credentials: "include",
+        });
+        if (!alive) return;
+        setIsAuthed(resp.ok);
+      } catch {
+        if (!alive) return;
+        setIsAuthed(false);
+      }
+    }
+
+    checkMe();
+    return () => {
+      alive = false;
+    };
+  }, [API]);
+
+  async function logout() {
+    try {
+      await fetch(`${API}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      setIsAuthed(false);
+    }
+  }
+
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
@@ -269,94 +309,94 @@ export default function LandingPage() {
                 Photo → match → comps
               </div>
             </div>
-
+            
             {/* RIGHT */}
-            <div className="flex md:justify-end">
-              {/* Soft surface (less “card”, more “panel”) */}
-              <div className="w-full max-w-md rounded-3xl px-8 py-8 backdrop-blur-xl bg-white/[0.045] ring-1 ring-white/10 relative overflow-hidden">
-                {/* subtle moving glow */}
-                <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl animate-[floatGlow_10s_ease-in-out_infinite]" />
-                <div className="pointer-events-none absolute -bottom-28 -right-28 h-72 w-72 rounded-full bg-emerald-400/8 blur-3xl animate-[floatGlow2_12s_ease-in-out_infinite]" />
+              <div className="flex md:justify-end">
+                {isAuthed ? (
+                  <AuthPanel variant="landing" />
+                ) : (
+                  <div className="w-full max-w-md rounded-3xl px-8 py-8 backdrop-blur-xl bg-white/[0.045] ring-1 ring-white/10 relative overflow-hidden">
+                    {/* subtle moving glow */}
+                    <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl animate-[floatGlow_10s_ease-in-out_infinite]" />
+                    <div className="pointer-events-none absolute -bottom-28 -right-28 h-72 w-72 rounded-full bg-emerald-400/8 blur-3xl animate-[floatGlow2_12s_ease-in-out_infinite]" />
 
-                <div className="relative">
-                  {/* Header + chip */}
-                  <div className="flex items-start justify-between gap-4 mb-6">
-                    <div>
-                      <div className="text-base font-semibold text-slate-100">Welcome back</div>
-                      <div className="text-sm text-slate-400">Login, or jump straight into demo mode.</div>
+                    {/* IMPORTANT: content needs to be in a relative wrapper */}
+                    <div className="relative">
+                      {/* Header + chip */}
+                      <div className="flex items-start justify-between gap-4 mb-6">
+                        <div>
+                          <div className="text-base font-semibold text-slate-100">Welcome back</div>
+                          <div className="text-sm text-slate-400">Login, or jump straight into demo mode.</div>
+                        </div>
+
+                        <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10">
+                          <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50 animate-ping" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                          </span>
+                          demo enabled
+                        </div>
+                      </div>
+
+                      {/* Primary action with glow */}
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl opacity-70" />
+                        <button
+                          type="button"
+                          onClick={() => router.push("/login")}
+                          className="relative w-full rounded-2xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-400 transition"
+                        >
+                          Login
+                        </button>
+                      </div>
+
+                      {/* Secondary */}
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={() => router.push("/register")}
+                          className="w-full rounded-2xl bg-white/[0.02] px-5 py-3 text-sm font-semibold text-slate-200 ring-1 ring-white/10 hover:bg-white/[0.05] transition"
+                        >
+                          Create account <span className="text-blue-300">Get started</span>
+                        </button>
+                      </div>
+
+                      {/* Demo */}
+                      <div className="mt-6">
+                        <button
+                          type="button"
+                          onClick={() => router.push("/app")}
+                          className="group w-full rounded-2xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/[0.03] ring-1 ring-transparent hover:ring-white/10 transition"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Try it without signing in</span>
+                            <span className="inline-flex items-center gap-2 text-blue-300">
+                              Open demo
+                              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">Uses sample mode — no account required.</div>
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50 animate-ping" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-                      </span>
-                      demo enabled
-                    </div>
+                    <style jsx>{`
+                      @keyframes floatGlow {
+                        0% { transform: translate(0px, 0px); opacity: 0.65; }
+                        50% { transform: translate(22px, 12px); opacity: 0.85; }
+                        100% { transform: translate(0px, 0px); opacity: 0.65; }
+                      }
+                      @keyframes floatGlow2 {
+                        0% { transform: translate(0px, 0px); opacity: 0.55; }
+                        50% { transform: translate(-18px, -10px); opacity: 0.75; }
+                        100% { transform: translate(0px, 0px); opacity: 0.55; }
+                      }
+                    `}</style>
                   </div>
-
-                  {/* Primary action with glow */}
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl opacity-70" />
-                    <button
-                      type="button"
-                      onClick={() => router.push("/login")}
-                      className="relative w-full rounded-2xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-400 transition"
-                    >
-                      Login
-                    </button>
-                  </div>
-
-                  {/* Secondary */}
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={() => router.push("/register")}
-                      className="w-full rounded-2xl bg-white/[0.02] px-5 py-3 text-sm font-semibold text-slate-200 ring-1 ring-white/10 hover:bg-white/[0.05] transition"
-                    >
-                      Create account <span className="text-blue-300">Get started</span>
-                    </button>
-                  </div>
-
-                  {/* “Demo” as a designed link row */}
-                  <div className="mt-6">
-                    <button
-                      type="button"
-                      onClick={() => router.push("/app")}
-                      className="group w-full rounded-2xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/[0.03] ring-1 ring-transparent hover:ring-white/10 transition"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Try it without signing in</span>
-                        <span className="inline-flex items-center gap-2 text-blue-300">
-                          Open demo
-                          <span className="transition-transform group-hover:translate-x-0.5">→</span>
-                        </span>
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Uses sample mode — no account required.
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                <style jsx>{`
-                  @keyframes floatGlow {
-                    0% { transform: translate(0px, 0px); opacity: 0.65; }
-                    50% { transform: translate(22px, 12px); opacity: 0.85; }
-                    100% { transform: translate(0px, 0px); opacity: 0.65; }
-                  }
-                  @keyframes floatGlow2 {
-                    0% { transform: translate(0px, 0px); opacity: 0.55; }
-                    50% { transform: translate(-18px, -10px); opacity: 0.75; }
-                    100% { transform: translate(0px, 0px); opacity: 0.55; }
-                  }
-                `}</style>
+                )}
               </div>
-            </div>
           </div>
         </div>
-
-
         {/* Optional footer space (keeps layout from feeling cramped on tall screens) */}
         <div className="h-10" />
       </div>

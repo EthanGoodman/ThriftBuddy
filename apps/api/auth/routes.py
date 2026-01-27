@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -15,9 +15,9 @@ import os
 import jwt
 
 
+COOKIE_NAME = "access_token"
 
 router = APIRouter()
-
 
 # ---------- Schemas ----------
 class RegisterRequest(BaseModel):
@@ -49,7 +49,10 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 def create_access_token(*, user_id: str, email: str) -> str:
-    secret = os.getenv("JWT_SECRET", "dev-secret-change-me")
+    secret = os.getenv("JWT_SECRET")
+    if not secret:
+        raise RuntimeError("JWT_SECRET is not set")
+
     exp_minutes = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
     payload = {
         "sub": user_id,
@@ -58,6 +61,20 @@ def create_access_token(*, user_id: str, email: str) -> str:
         "iat": datetime.utcnow(),
     }
     return jwt.encode(payload, secret, algorithm="HS256")
+
+def decode_access_token(token: str) -> dict:
+    secret = os.getenv("JWT_SECRET")
+    if not secret:
+        raise RuntimeError("JWT_SECRET is not set")
+
+    try:
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 
 
 
@@ -119,7 +136,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> UserOut
     )
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> LoginResponse:
     email_norm = normalize_email(payload.email)
 
     user = (
@@ -151,5 +168,46 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse
         db.rollback()
 
     token = create_access_token(user_id=str(user.id), email=user.email)
+
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=(os.getenv("ENV", "").lower() == "production"),
+        samesite="lax",
+        path="/",
+        max_age=int(os.getenv("JWT_EXPIRE_MINUTES", "60")) * 60,
+    )
+
     return LoginResponse(access_token=token)
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response) -> None:
+    response.delete_cookie(key=COOKIE_NAME, path="/")
+    return None
+
+@router.get("/me", response_model=UserOut)
+def me(request: Request, db: Session = Depends(get_db)) -> UserOut:
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    payload = decode_access_token(token)
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return UserOut(
+        id=str(user.id),
+        email=user.email,
+        display_name=user.display_name,
+        email_verified=bool(user.email_verified),
+        created_at=user.created_at.isoformat()
+    )
+
 
