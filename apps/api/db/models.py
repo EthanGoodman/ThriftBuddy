@@ -1,11 +1,6 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Boolean, DateTime, text
+from sqlalchemy import String, Boolean, DateTime, Integer, text
 from sqlalchemy.dialects.postgresql import UUID
-
-
-class Base(DeclarativeBase):
-    pass
-
+from sqlalchemy.orm import Mapped, mapped_column
 
 class User(Base):
     __tablename__ = "users"
@@ -31,6 +26,13 @@ class User(Base):
 
     oauth_provider: Mapped[str | None] = mapped_column(String, nullable=True)
     oauth_subject: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # -----------------------------
+    # Passwordless login (OTP)
+    # -----------------------------
+    login_code_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    login_code_expires_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    login_code_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
 
     created_at: Mapped[str] = mapped_column(
         DateTime(timezone=True),

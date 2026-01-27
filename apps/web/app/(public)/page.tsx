@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import AuthPanel from "@/components/auth/AuthPanel"
-import { useAuth } from "@/components/auth/useAuth";
 
 type Theme = "dark" | "light";
 
@@ -89,14 +87,12 @@ function useTypewriter(
     let t: any;
 
     if (!deleting) {
-      // typing
       if (sub < phrase.length) {
         t = setTimeout(() => setSub((s) => s + 1), typeMs);
       } else {
         t = setTimeout(() => setDeleting(true), holdMs);
       }
     } else {
-      // deleting
       if (sub > 0) {
         t = setTimeout(() => setSub((s) => s - 1), deleteMs);
       } else {
@@ -122,7 +118,6 @@ function TypeLine() {
     pauseBetweenMs: 400,
   });
 
-
   return (
     <div className="mt-4 flex items-center gap-2 text-lg text-slate-300 leading-relaxed">
       <span className="text-blue-300/90">›</span>
@@ -135,19 +130,23 @@ function TypeLine() {
 
       <style jsx>{`
         @keyframes caretBlink {
-          0%, 49% { opacity: 1; }
-          50%, 100% { opacity: 0; }
+          0%,
+          49% {
+            opacity: 1;
+          }
+          50%,
+          100% {
+            opacity: 0;
+          }
         }
       `}</style>
     </div>
   );
 }
 
-
 function DemoSteps() {
   const [activeIdx, setActiveIdx] = useState(0);
 
-  // cycle the “current step” slowly (illustrative, not fake progress)
   useEffect(() => {
     const t = setInterval(() => {
       setActiveIdx((i) => (i + 1) % DEMO_STEPS.length);
@@ -156,15 +155,12 @@ function DemoSteps() {
   }, []);
 
   const done = useMemo(() => {
-    // steps before active are "done"
     return new Set<number>(Array.from({ length: activeIdx }, (_, i) => i));
   }, [activeIdx]);
 
   return (
     <div className="mt-7">
-      <div className="text-xs font-semibold text-slate-300/90 mb-3">
-        Live pipeline preview
-      </div>
+      <div className="text-xs font-semibold text-slate-300/90 mb-3">Live pipeline preview</div>
 
       <ul className="space-y-2.5">
         {DEMO_STEPS.map((label, idx) => {
@@ -180,8 +176,8 @@ function DemoSteps() {
                   isActive
                     ? "border-blue-400/70 text-blue-400 animate-[softPulse_1.8s_ease-in-out_infinite]"
                     : isDone
-                      ? "border-emerald-400/70 text-emerald-400"
-                      : "border-white/10 text-slate-500",
+                    ? "border-emerald-400/70 text-emerald-400"
+                    : "border-white/10 text-slate-500",
                 ].join(" ")}
                 aria-hidden="true"
               >
@@ -194,8 +190,8 @@ function DemoSteps() {
                   isActive
                     ? "text-slate-200 animate-[softPulseText_1.8s_ease-in-out_infinite]"
                     : isDone
-                      ? "text-slate-200/90"
-                      : "text-slate-400/80",
+                    ? "text-slate-200/90"
+                    : "text-slate-400/80",
                 ].join(" ")}
               >
                 {label}
@@ -207,16 +203,31 @@ function DemoSteps() {
 
       <style jsx>{`
         @keyframes softPulse {
-            0% { transform: scale(1); opacity: 0.85; }
-            50% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.85; }
+          0% {
+            transform: scale(1);
+            opacity: 0.85;
+          }
+          50% {
+            transform: scale(1.05);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 0.85;
+          }
         }
         @keyframes softPulseText {
-            0% { opacity: 0.75; }
-            50% { opacity: 1; }
-            100% { opacity: 0.75; }
+          0% {
+            opacity: 0.75;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0.75;
+          }
         }
-        `}</style>
+      `}</style>
     </div>
   );
 }
@@ -224,11 +235,10 @@ function DemoSteps() {
 export default function LandingPage() {
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL!;
-  const { isAuthed } = useAuth(API);
 
   const [theme, setTheme] = useState<Theme>("dark");
+  const [entering, setEntering] = useState(false);
 
-  
   // load saved theme once (default dark)
   useEffect(() => {
     const saved = (localStorage.getItem("tb_theme") as Theme | null) ?? "dark";
@@ -242,6 +252,23 @@ export default function LandingPage() {
     else root.classList.remove("dark");
     localStorage.setItem("tb_theme", theme);
   }, [theme]);
+
+  async function enterApp() {
+    if (entering) return;
+    setEntering(true);
+    try {
+      // Track unique visitor (sets tb_vid cookie + inserts into DB)
+      await fetch(`${API}/track`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // If tracking fails, still let them in
+    } finally {
+      router.push("/app");
+      // no need to setEntering(false) since we navigate away
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
@@ -261,90 +288,98 @@ export default function LandingPage() {
             {/* LEFT */}
             <div className="max-w-xl">
               <h1 className="text-6xl md:text-7xl font-semibold tracking-tight text-slate-100">
-                <span className="text-blue-400"> Understand true {" "}</span>
-                  resale value
+                <span className="text-blue-400"> Understand true{" "}</span>
+                resale value
               </h1>
-              {/* Replaces the paragraph */}
+
               <TypeLine />
 
-              {/* Steps */}
               <DemoSteps />
 
-              <div className="mt-7 text-sm text-slate-400/90">
-                Photo → match → comps
-              </div>
+              <div className="mt-7 text-sm text-slate-400/90">Photo → match → comps</div>
             </div>
-            
+
             {/* RIGHT */}
-              <div className="flex md:justify-end">
-                {isAuthed ? (
-                  <AuthPanel variant="landing" />
-                ) : (
-                  <div className="w-full max-w-md rounded-3xl px-8 py-8 backdrop-blur-xl bg-white/[0.045] ring-1 ring-white/10 relative overflow-hidden">
-                    {/* subtle moving glow */}
-                    <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl animate-[floatGlow_10s_ease-in-out_infinite]" />
-                    <div className="pointer-events-none absolute -bottom-28 -right-28 h-72 w-72 rounded-full bg-emerald-400/8 blur-3xl animate-[floatGlow2_12s_ease-in-out_infinite]" />
+            <div className="flex md:justify-end">
+              <div className="w-full max-w-md rounded-3xl px-8 py-8 backdrop-blur-xl bg-white/[0.045] ring-1 ring-white/10 relative overflow-hidden">
+                {/* subtle moving glow */}
+                <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl animate-[floatGlow_10s_ease-in-out_infinite]" />
+                <div className="pointer-events-none absolute -bottom-28 -right-28 h-72 w-72 rounded-full bg-emerald-400/8 blur-3xl animate-[floatGlow2_12s_ease-in-out_infinite]" />
 
-                    {/* IMPORTANT: content needs to be in a relative wrapper */}
-                    <div className="relative">
-                      {/* Header + chip */}
-                      <div className="flex items-start justify-between gap-4 mb-6">
-                        <div>
-                          <div className="text-base font-semibold text-slate-100">Welcome back</div>
-                          <div className="text-sm text-slate-400">Login, or jump straight into demo mode.</div>
-                        </div>
-
-                        <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10">
-                          <span className="relative flex h-2 w-2">
-                            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50 animate-ping" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-                          </span>
-                          partial access
-                        </div>
-                      </div>
-
-                      {/* Primary action with glow */}
-                      <div className="relative">
-                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl opacity-70" />
-                        <button
-                          type="button"
-                          onClick={() => router.push("/login")}
-                          className="relative w-full rounded-2xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-400 transition"
-                        >
-                          Login
-                        </button>
-                      </div>
-
-                      {/* Secondary */}
-                      <div className="mt-4">
-                        <button
-                          type="button"
-                          onClick={() => router.push("/register")}
-                          className="w-full rounded-2xl bg-white/[0.02] px-5 py-3 text-sm font-semibold text-slate-200 ring-1 ring-white/10 hover:bg-white/[0.05] transition"
-                        >
-                          Create account <span className="text-blue-300">Start free</span>
-                        </button>
-                      </div>
+                <div className="relative">
+                  {/* Header + chip */}
+                  <div className="flex items-start justify-between gap-4 mb-6">
+                    <div>
+                      <div className="text-base font-semibold text-slate-100">Welcome</div>
+                      <div className="text-sm text-slate-400">Jump into the app — no account needed.</div>
                     </div>
 
-                    <style jsx>{`
-                      @keyframes floatGlow {
-                        0% { transform: translate(0px, 0px); opacity: 0.65; }
-                        50% { transform: translate(22px, 12px); opacity: 0.85; }
-                        100% { transform: translate(0px, 0px); opacity: 0.65; }
-                      }
-                      @keyframes floatGlow2 {
-                        0% { transform: translate(0px, 0px); opacity: 0.55; }
-                        50% { transform: translate(-18px, -10px); opacity: 0.75; }
-                        100% { transform: translate(0px, 0px); opacity: 0.55; }
-                      }
-                    `}</style>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50 animate-ping" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                      </span>
+                      open access
+                    </div>
                   </div>
-                )}
+
+                  {/* Primary action with glow */}
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl opacity-70" />
+                    <button
+                      type="button"
+                      onClick={enterApp}
+                      disabled={entering}
+                      className={[
+                        "relative w-full rounded-2xl px-5 py-3 text-sm font-semibold text-white transition",
+                        entering ? "bg-blue-500/70 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-400",
+                      ].join(" ")}
+                    >
+                      {entering ? "Entering..." : "Enter the app"}
+                    </button>
+                  </div>
+
+                  {/* Secondary (optional) */}
+                  <div className="mt-4 text-xs text-slate-400">
+                    We use a single anonymous cookie to count unique visitors.
+                  </div>
+                </div>
+
+                <style jsx>{`
+                  @keyframes floatGlow {
+                    0% {
+                      transform: translate(0px, 0px);
+                      opacity: 0.65;
+                    }
+                    50% {
+                      transform: translate(22px, 12px);
+                      opacity: 0.85;
+                    }
+                    100% {
+                      transform: translate(0px, 0px);
+                      opacity: 0.65;
+                    }
+                  }
+                  @keyframes floatGlow2 {
+                    0% {
+                      transform: translate(0px, 0px);
+                      opacity: 0.55;
+                    }
+                    50% {
+                      transform: translate(-18px, -10px);
+                      opacity: 0.75;
+                    }
+                    100% {
+                      transform: translate(0px, 0px);
+                      opacity: 0.55;
+                    }
+                  }
+                `}</style>
               </div>
+            </div>
           </div>
         </div>
-        {/* Optional footer space (keeps layout from feeling cramped on tall screens) */}
+
         <div className="h-10" />
       </div>
     </div>

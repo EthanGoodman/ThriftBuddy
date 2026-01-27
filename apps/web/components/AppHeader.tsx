@@ -98,40 +98,6 @@ export default function AppHeader() {
                 {!isLanding && (
                   <ThemeToggle theme={theme} setTheme={setTheme} />
                 )}
-
-                {!isAuthed ? (
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href="/login"
-                      className={[
-                        "rounded-xl px-4 py-2 text-sm font-semibold transition ring-1",
-                        "text-slate-700 hover:bg-slate-900/5 ring-slate-200 bg-white/60",
-                        "dark:text-slate-200 dark:hover:bg-white/[0.05] dark:ring-white/5 dark:bg-white/[0.03]",
-                        onAuthPages && pathname === "/login" ? (theme === "dark" ? "bg-white/[0.06]" : "bg-slate-900/5") : "",
-                      ].join(" ")}
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      href="/register"
-                      className={[
-                        "rounded-xl px-4 py-2 text-sm font-semibold transition",
-                        "bg-blue-500 text-white hover:bg-blue-400",
-                        onAuthPages && pathname === "/register" ? "ring-2 ring-blue-300/40" : "",
-                      ].join(" ")}
-                    >
-                      Register
-                    </Link>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={logout}
-                    className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-200 ring-1 ring-white/5 bg-white/[0.03] hover:bg-white/[0.06] transition"
-                  >
-                    Logout
-                  </button>
-                )}
               </div>
             </div>
           </div>

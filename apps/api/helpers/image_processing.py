@@ -1,49 +1,19 @@
 from typing import Any, Dict, List, Optional, Tuple
 from fastapi import UploadFile
 import httpx
-from PIL import Image
-from io import BytesIO
-import torch
-import open_clip
 import asyncio
-import anyio
+import os
+
+CLIP_URL = os.environ["CLIP_URL"].rstrip("/")
 
 # ---- Thumbnail embedding cache (in-memory) ----
 # Key: product_id (str) OR thumbnail URL as fallback
 _THUMB_EMBED_CACHE: Dict[str, List[List[float]]] = {}
 
 # ---- Image Embedding (OpenCLIP) ----
-_CLIP_MODEL = None
-_CLIP_PREPROCESS = None
-_CLIP_TOKENIZER = None
-_CLIP_DEVICE = "cpu"  # keep CPU for now (safe default)
 MAIN_CROPS = [1.0, 0.85]
 EMBED_MAX_INITIAL = 50
 THUMB_CONCURRENCY = 6
-
-def _load_clip():
-    """
-    Lazy-load and cache the CLIP model + preprocess.
-    """
-    global _CLIP_MODEL, _CLIP_PREPROCESS, _CLIP_TOKENIZER, _CLIP_DEVICE
-
-    if _CLIP_MODEL is not None:
-        return _CLIP_MODEL, _CLIP_PREPROCESS
-
-    # Good default: ViT-B-32 pretrained on LAION2B (common + solid)
-    model_name = "ViT-B-32"
-    pretrained = "laion2b_s34b_b79k"
-
-    model, _, preprocess = open_clip.create_model_and_transforms(
-        model_name=model_name,
-        pretrained=pretrained,
-    )
-    model.eval()
-    model.to(_CLIP_DEVICE)
-
-    _CLIP_MODEL = model
-    _CLIP_PREPROCESS = preprocess
-    return _CLIP_MODEL, _CLIP_PREPROCESS
 
 async def embed_initial_thumbnails_if_needed(
     *,
@@ -71,14 +41,8 @@ async def read_images(
     return main_bytes, extra_bytes
 
 async def embed_main_image(main_bytes: bytes) -> List[List[float]]:
-    return await image_bytes_to_embeddings_multicrop_async(
-        main_bytes, crops=MAIN_CROPS
-    )
+    return await clip_embed_bytes(main_bytes, crops=MAIN_CROPS)
 
-async def image_bytes_to_embeddings_multicrop_async(img_bytes: bytes, *, crops: List[float]) -> List[List[float]]:
-    return await anyio.to_thread.run_sync(
-        lambda: image_bytes_to_embeddings_multicrop(img_bytes, crops=crops)
-    )
 
 async def embed_thumbnails_for_items(
     items: List[Dict[str, Any]],
@@ -122,7 +86,7 @@ async def embed_thumbnails_for_items(
                 return
 
             try:
-                vecs = await image_bytes_to_embeddings_multicrop_async(img_bytes, crops=[1.0, 0.85])
+                vecs = await clip_embed_bytes(img_bytes, crops=[1.0, 0.85])
                 _THUMB_EMBED_CACHE[cache_key] = vecs
                 it["_thumb_embedding"] = vecs
                 it["_thumb_embed_status"] = "ok"
@@ -139,26 +103,6 @@ async def embed_thumbnails_for_items(
 
     return {"processed": len(target_items), "status_counts": counts}
 
-def image_bytes_to_embedding(img_bytes: bytes) -> List[float]:
-    """
-    Converts image bytes to a normalized CLIP embedding vector.
-    Returns a Python list[float] so it's JSON-serializable.
-    """
-    model, preprocess = _load_clip()
-
-    # Decode image
-    img = Image.open(BytesIO(img_bytes)).convert("RGB")
-
-    # Preprocess -> tensor [1, 3, H, W]
-    image_tensor = preprocess(img).unsqueeze(0).to(_CLIP_DEVICE)
-
-    with torch.no_grad():
-        feats = model.encode_image(image_tensor)  # [1, D]
-        feats = feats / feats.norm(dim=-1, keepdim=True)  # normalize for cosine similarity
-        vec = feats[0].cpu().tolist()
-
-    return vec
-
 async def fetch_image_bytes(url: str, http: httpx.AsyncClient) -> Optional[bytes]:
     """
     Download image bytes. Returns None on failure.
@@ -173,50 +117,11 @@ async def fetch_image_bytes(url: str, http: httpx.AsyncClient) -> Optional[bytes
     except Exception:
         return None
     
-def image_bytes_to_embeddings_multicrop(
-    img_bytes: bytes,
-    *,
-    crops: List[float] = [1.0, 0.85, 0.65],  # full, medium center crop, tight center crop
-) -> List[List[float]]:
-    """
-    Returns multiple normalized CLIP embeddings for multiple center crops.
+async def clip_embed_bytes(img_bytes: bytes, *, crops: List[float]) -> List[List[float]]:
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        files = {"image": ("image.jpg", img_bytes, "image/jpeg")}
+        r = await client.post(f"{CLIP_URL}/embed", files=files)
+        r.raise_for_status()
+        return r.json()["embeddings"]
 
-    crops: list of fractions of the shorter side to keep (1.0 = full image)
-    """
-    model, preprocess = _load_clip()
-
-    img = Image.open(BytesIO(img_bytes)).convert("RGB")
-
-    w, h = img.size
-    side = min(w, h)
-
-    vectors: List[List[float]] = []
-
-    for frac in crops:
-        frac = float(frac)
-        if frac <= 0 or frac > 1.0:
-            continue
-
-        crop_side = max(1, int(side * frac))
-        left = (w - crop_side) // 2
-        top = (h - crop_side) // 2
-        right = left + crop_side
-        bottom = top + crop_side
-
-        cropped = img.crop((left, top, right, bottom))
-
-        image_tensor = preprocess(cropped).unsqueeze(0).to(_CLIP_DEVICE)
-
-        with torch.no_grad():
-            feats = model.encode_image(image_tensor)  # [1, D]
-            feats = feats / feats.norm(dim=-1, keepdim=True)  # normalize
-            vec = feats[0].cpu().tolist()
-
-        vectors.append(vec)
-
-    # Fallback if something weird happened
-    if not vectors:
-        vectors = [image_bytes_to_embedding(img_bytes)]
-
-    return vectors
-
+    

@@ -1,0 +1,93 @@
+# apps/clip_service/main.py
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from typing import List
+from io import BytesIO
+from PIL import Image
+import torch
+import open_clip
+import asyncio
+
+app = FastAPI()
+
+_CLIP_MODEL = None
+_CLIP_PREPROCESS = None
+_CLIP_DEVICE = "cpu"
+MAIN_CROPS = [1.0, 0.85]
+
+def _load_clip():
+    global _CLIP_MODEL, _CLIP_PREPROCESS
+    if _CLIP_MODEL is not None:
+        return _CLIP_MODEL, _CLIP_PREPROCESS
+
+    model_name = "ViT-B-32"
+    pretrained = "laion2b_s34b_b79k"
+    model, _, preprocess = open_clip.create_model_and_transforms(
+        model_name=model_name,
+        pretrained=pretrained,
+    )
+    model.eval()
+    model.to(_CLIP_DEVICE)
+    _CLIP_MODEL = model
+    _CLIP_PREPROCESS = preprocess
+    return _CLIP_MODEL, _CLIP_PREPROCESS
+
+@app.on_event("startup")
+def warm_model():
+    _load_clip()
+
+def image_bytes_to_embeddings_multicrop(img_bytes: bytes, crops: List[float]) -> List[List[float]]:
+    model, preprocess = _load_clip()
+    img = Image.open(BytesIO(img_bytes)).convert("RGB")
+    w, h = img.size
+    side = min(w, h)
+
+    vectors: List[List[float]] = []
+    for frac in crops:
+        crop_side = max(1, int(side * float(frac)))
+        left = (w - crop_side) // 2
+        top = (h - crop_side) // 2
+        cropped = img.crop((left, top, left + crop_side, top + crop_side))
+
+        image_tensor = preprocess(cropped).unsqueeze(0).to(_CLIP_DEVICE)
+        with torch.no_grad():
+            feats = model.encode_image(image_tensor)
+            feats = feats / feats.norm(dim=-1, keepdim=True)
+        vectors.append(feats[0].cpu().tolist())
+
+    return vectors or [[]]
+
+@app.post("/embed")
+async def embed(image: UploadFile = File(...)):
+    b = await image.read()
+    if not b:
+        raise HTTPException(status_code=400, detail="Empty image upload")
+    vecs = image_bytes_to_embeddings_multicrop(b, crops=MAIN_CROPS)
+    return {"embeddings": vecs, "crops": MAIN_CROPS}
+
+@app.post("/embed_batch")
+async def embed_batch(images: List[UploadFile] = File(...)):
+    if not images:
+        raise HTTPException(status_code=400, detail="No images uploaded")
+
+    async def embed_one(b: bytes) -> List[List[float]]:
+        # offload CPU-bound work to a thread so requests don’t block the event loop
+        return await asyncio.to_thread(
+            image_bytes_to_embeddings_multicrop,
+            b,
+            crops=MAIN_CROPS
+        )
+
+    results = []
+    for img in images:
+        b = await img.read()
+        if not b:
+            results.append({"ok": False, "embeddings": [], "error": "empty"})
+            continue
+        try:
+            vecs = await embed_one(b)
+            results.append({"ok": True, "embeddings": vecs})
+        except Exception:
+            results.append({"ok": False, "embeddings": [], "error": "embed_failed"})
+
+    return {"results": results, "crops": MAIN_CROPS}
+

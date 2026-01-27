@@ -41,12 +41,6 @@ FINAL_SIMILARITY_MIN = 0.68  # stricter than SIMILARITY_MIN
 FINAL_KEEP_TOP_K = 25        # optional: return fewer, higher quality
 
 
-
-@app.on_event("startup")
-def _startup():
-    image_processing._load_clip()
-
-
 def normalize_mode(mode: str) -> str:
     mode = (mode or "both").strip().lower()
     if mode not in ("active", "sold", "both"):
