@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/components/auth/useAuth"
 
 type Theme = "dark" | "light";
 
@@ -40,7 +39,6 @@ export default function AppHeader() {
   const isLanding = pathname === "/" || pathname === "/login" || pathname === "/register";
 
   const [theme, setTheme] = useState<Theme>("dark");
-  const { isAuthed, logout } = useAuth(API);
 
   useEffect(() => {
     const saved = (localStorage.getItem("tb_theme") as Theme | null) ?? "dark";
