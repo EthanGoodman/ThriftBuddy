@@ -36,31 +36,6 @@ function DotIcon() {
   );
 }
 
-function ThemeToggle({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      className={[
-        "relative inline-flex h-7 w-[64px] items-center rounded-full border shadow-sm transition",
-        "border-slate-300 bg-white hover:bg-slate-50",
-        "dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
-      ].join(" ")}
-    >
-      <span className="absolute left-2 text-xs select-none">🌙</span>
-      <span className="absolute right-2 text-xs select-none">☀️</span>
-      <span
-        className={[
-          "absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full shadow transition-transform",
-          "bg-slate-900 dark:bg-white",
-          theme === "dark" ? "translate-x-[4px]" : "translate-x-[36px]",
-        ].join(" ")}
-      />
-    </button>
-  );
-}
 
 const TAGLINES = [
   "Identify items from a photo.",
@@ -258,7 +233,7 @@ export default function LandingPage() {
     setEntering(true);
     try {
       // Track unique visitor (sets tb_vid cookie + inserts into DB)
-      await fetch(`${API}/track`, {
+      await fetch(`${API}/auth/track`, {
         method: "POST",
         credentials: "include",
       });
