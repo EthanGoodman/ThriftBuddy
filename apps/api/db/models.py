@@ -1,6 +1,10 @@
 from sqlalchemy import String, Boolean, DateTime, Integer, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
+
+from .base import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -47,4 +51,19 @@ class User(Base):
     last_login_at: Mapped[str | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+
+class VisitorId(Base):
+    __tablename__ = "visitor_ids"
+
+    id: Mapped[str] = mapped_column(
+        String,
+        primary_key=True,
+    )
+
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
     )
