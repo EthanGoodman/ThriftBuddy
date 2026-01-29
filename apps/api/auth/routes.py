@@ -33,8 +33,8 @@ def track_visit(request: Request, response: Response, db: Session = Depends(get_
             key=VISITOR_COOKIE,
             value=vid,
             httponly=True,
-            secure=is_prod(),
-            samesite="lax",
+            secure=True
+            samesite="none",
             path="/",
             max_age=60 * 60 * 24 * 365,  # 1 year
         )
