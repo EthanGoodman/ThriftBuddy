@@ -316,10 +316,10 @@ def build_frontend_payload(
     active_n = len(active_matches)
     sold_n = len(sold_matches)
 
-    example_items = (sold_matches + active_matches)
-    examples = _pick_example_listings(example_items, k=50)
+    active_listings = _pick_example_listings(active_matches, k=50)
+    sold_listings = _pick_example_listings(sold_matches, k=50)
 
-    category = _infer_category_hint(refined_query or initial_query, examples)
+    category = _infer_category_hint(refined_query or initial_query, active_listings)
     advice = _legit_advice(category)
 
     rarity = _rarity_label(active_n=active_n, sold_n=sold_n)
@@ -349,6 +349,7 @@ def build_frontend_payload(
             "rarity": rarity,
         },
         "legit_check_advice": advice,
-        "example_listings": examples,
+        "active_listings": active_listings,
+        "sold_listings": sold_listings,
         "summary": summary,
     }

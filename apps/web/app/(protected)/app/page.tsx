@@ -12,7 +12,7 @@ type Preview = {
   label: string;
 };
 
-type Mode = "active" | "sold";
+type Mode = "active" | "sold" | "both";
 
 type PriceRange = {
   n: number;
@@ -46,7 +46,8 @@ type FrontendPayload = {
     rarity: "high" | "medium" | "common" | string;
   };
   legit_check_advice: string[];
-  example_listings: ExampleListing[];
+  active_listings: ExampleListing[];
+  sold_listings: ExampleListing[];
   summary: string;
   timing_sec?: number;
 };
@@ -566,7 +567,7 @@ export default function MyNextFastAPIApp() {
       summary: [activeData?.summary, soldData?.summary].filter(Boolean).join("\n\n"),
 
       // optional timing
-      timing_sec: Math.round(((activeData?.timing_sec ?? 0) + (soldData?.timing_sec ?? 0)) * 1000) / 1000,
+      timing_sec: activeData  && soldData ? Math.round(((activeData?.timing_sec ?? 0)) * 1000) / 1000 : Math.round(((activeData?.timing_sec ?? 0) + (soldData?.timing_sec ?? 0)) * 1000) / 1000,
     };
   }, [activeData, soldData]);
 
@@ -811,78 +812,106 @@ export default function MyNextFastAPIApp() {
   }, [lightboxUrl]);
 
   async function runMode(mode: Mode) {
-    if (!mainImage) {
-      const msg = "Please upload a Main Image (full item, straight-on) before sending.";
-      if (mode === "active") setActiveError(msg);
-      else setSoldError(msg);
-      return;
+  if (!mainImage) {
+    const msg = "Please upload a Main Image (full item, straight-on) before sending.";
+    if (mode === "active") setActiveError(msg);
+    else if (mode === "sold") setSoldError(msg);
+    else { // both
+      setActiveError(msg);
+      setSoldError(msg);
+    }
+    return;
+  }
+
+  setHasRunOnce(true);
+  setCollapseForm(true);
+  setSubmitAttempted(true);
+
+  // clear errors
+  if (mode === "active") setActiveError("");
+  else if (mode === "sold") setSoldError("");
+  else {
+    setActiveError("");
+    setSoldError("");
+  }
+
+  // abort any previous run for this mode
+  if (mode === "active") activeAbortRef.current?.abort();
+  else if (mode === "sold") soldAbortRef.current?.abort();
+  else {
+    activeAbortRef.current?.abort();
+    soldAbortRef.current?.abort();
+  }
+
+  const controller = new AbortController();
+  if (mode === "active") activeAbortRef.current = controller;
+  else if (mode === "sold") soldAbortRef.current = controller;
+  else {
+    activeAbortRef.current = controller;
+    soldAbortRef.current = controller;
+  }
+
+  try {
+    // IMPORTANT: make sure loading is set true somewhere before fetch
+    if (mode === "active") setActiveLoading(true);
+    else if (mode === "sold") setSoldLoading(true);
+    else {
+      setActiveLoading(true);
+      setSoldLoading(true);
     }
 
-    setHasRunOnce(true);
-    setCollapseForm(true);
-    setSubmitAttempted(true);
+    const form = new FormData();
+    form.append("main_image", mainImage);
 
-    if (mode === "active") setActiveError("");
-    else setSoldError("");
+    const prompt = textInput.trim();
+    const item = itemName.trim();
+    if (prompt.length > 0) form.append("text", prompt);
+    if (item.length > 0) form.append("itemName", item);
 
+    const extras = files.filter(Boolean) as File[];
+    for (const f of extras) form.append("files", f);
 
-    // abort any previous run for this mode
-    if (mode === "active") activeAbortRef.current?.abort();
-    else soldAbortRef.current?.abort();
+    form.append("mode", mode);
 
-    const controller = new AbortController();
-    if (mode === "active") activeAbortRef.current = controller;
-    else soldAbortRef.current = controller;
+    const res = await fetch("/api/py/extract-file-stream", {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
 
-    try {
-      const form = new FormData();
-      form.append("main_image", mainImage);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Request failed: ${res.status}${txt ? ` - ${txt}` : ""}`);
+    }
 
-      const prompt = textInput.trim();
-      const item = itemName.trim();
-      if (prompt.length > 0) form.append("text", prompt);
-      if (item.length > 0) form.append("itemName", item);
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("No response body stream");
 
-      const extras = files.filter(Boolean) as File[];
-      for (const f of extras) form.append("files", f);
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-      form.append("mode", mode);
-
-      const res = await fetch("/api/py/extract-file-stream", {
-        method: "POST",
-        body: form,
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(`Request failed: ${res.status}${txt ? ` - ${txt}` : ""}`);
+    const setProgress = (p: number) => {
+      const clamped = Math.max(0, Math.min(1, p));
+      if (mode === "active") setActiveProgress(clamped);
+      else if (mode === "sold") setSoldProgress(clamped);
+      else {
+        setActiveProgress(clamped);
+        setSoldProgress(clamped);
       }
+    };
 
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No response body stream");
+    const setStep = (stepId: string, status: StepStatus) => {
+      if (mode === "active") setActiveSteps(prev => ({ ...prev, [stepId]: status }));
+      else if (mode === "sold") setSoldSteps(prev => ({ ...prev, [stepId]: status }));
+      else {
+        setActiveSteps(prev => ({ ...prev, [stepId]: status }));
+        setSoldSteps(prev => ({ ...prev, [stepId]: status }));
+      }
+    };
 
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      const setProgress = (p: number) => {
-        const clamped = Math.max(0, Math.min(1, p));
-        if (mode === "active") setActiveProgress(clamped);
-        else setSoldProgress(clamped);
-      };
-
-      const setStep = (stepId: string, status: StepStatus) => {
-        if (mode === "active") {
-          setActiveSteps(prev => ({ ...prev, [stepId]: status }));
-        } else {
-          setSoldSteps(prev => ({ ...prev, [stepId]: status }));
-        }
-      };
-
-      // helper: when a step starts, mark any other "active" step as done (keeps one current step)
-      const normalizeActives = (currentStepId: string) => {
-        const setter = mode === "active" ? setActiveSteps : setSoldSteps;
-        setter(prev => {
+    const normalizeActives = (currentStepId: string) => {
+      const normalize = (setter: any) => {
+        setter((prev: any) => {
           const next = { ...prev };
           for (const k of Object.keys(next)) {
             if (k !== currentStepId && next[k] === "active") next[k] = "done";
@@ -891,77 +920,102 @@ export default function MyNextFastAPIApp() {
         });
       };
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
+      if (mode === "active") normalize(setActiveSteps);
+      else if (mode === "sold") normalize(setSoldSteps);
+      else {
+        normalize(setActiveSteps);
+        normalize(setSoldSteps);
+      }
+    };
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+    const handleLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
+      let msg: StreamEvent;
+      try {
+        msg = JSON.parse(trimmed);
+      } catch {
+        return; // ignore malformed chunk
+      }
 
-          let msg: StreamEvent;
-          try {
-            msg = JSON.parse(trimmed);
-          } catch {
-            continue; // ignore malformed chunk
-          }
+      if (msg.type === "step") {
+        if (msg.pct != null) setProgress(msg.pct);
 
-          if (msg.type === "step") {
-            if (msg.pct != null) setProgress(msg.pct);
-
-            if (msg.status === "start") {
-              normalizeActives(msg.step_id);
-              setStep(msg.step_id, "active");
-            } else {
-              setStep(msg.step_id, "done");
-            }
-          }
-
-          if (msg.type === "error") {
-            throw new Error(parseStreamError(msg.error));
-          }
-
-          if (msg.type === "result") {
-            const payload = msg.data;
-
-            if (mode === "active") setActiveData(payload);
-            else setSoldData(payload);
-
-            setProgress(1);
-            // mark any active step as done
-            if (mode === "active") {
-              setActiveSteps(prev => {
-                const next = { ...prev };
-                for (const k of Object.keys(next)) if (next[k] === "active") next[k] = "done";
-                return next;
-              });
-            } else {
-              setSoldSteps(prev => {
-                const next = { ...prev };
-                for (const k of Object.keys(next)) if (next[k] === "active") next[k] = "done";
-                return next;
-              });
-            }
-          }
+        if (msg.status === "start") {
+          normalizeActives(msg.step_id);
+          setStep(msg.step_id, "active");
+        } else {
+          setStep(msg.step_id, "done");
         }
       }
-    } catch (e: any) {
-      const msg = e?.name === "AbortError" ? "Cancelled." : (e?.message ?? "Unknown error");
-      if (mode === "active") setActiveError(msg);
-      else setSoldError(msg);
-    } finally {
-      if (mode === "active") setActiveLoading(false);
-      else setSoldLoading(false);
+
+      if (msg.type === "error") {
+        throw new Error(parseStreamError(msg.error));
+      }
+
+      if (msg.type === "result") {
+        const payload = msg.data;
+
+        if (mode === "active") setActiveData(payload);
+        else if (mode === "sold") setSoldData(payload);
+        else {
+          // payload contains both in one response
+          setActiveData(payload);
+          setSoldData(payload);
+        }
+
+        setProgress(1);
+
+        const markDone = (setter: any) => {
+          setter((prev: any) => {
+            const next = { ...prev };
+            for (const k of Object.keys(next)) if (next[k] === "active") next[k] = "done";
+            return next;
+          });
+        };
+
+        if (mode === "active") markDone(setActiveSteps);
+        else if (mode === "sold") markDone(setSoldSteps);
+        else {
+          markDone(setActiveSteps);
+          markDone(setSoldSteps);
+        }
+      }
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) handleLine(line);
+    }
+
+    const tail = buffer.trim();
+    if (tail) handleLine(tail);
+
+  } catch (e: any) {
+    const msg = e?.name === "AbortError" ? "Cancelled." : (e?.message ?? "Unknown error");
+    if (mode === "active") setActiveError(msg);
+    else if (mode === "sold") setSoldError(msg);
+    else {
+      setActiveError(msg);
+      setSoldError(msg);
+    }
+  } finally {
+    if (mode === "active") setActiveLoading(false);
+    else if (mode === "sold") setSoldLoading(false);
+    else {
+      setActiveLoading(false);
+      setSoldLoading(false);
     }
   }
+}
 
-  async function runBoth() {
-    await Promise.allSettled([runMode("active"), runMode("sold")]);
-  }
 
   function Thumb({
     p,
@@ -1313,7 +1367,7 @@ export default function MyNextFastAPIApp() {
                     if (runSold) resetModeForNewRun("sold");
 
                     // Now actually run
-                    if (runActive && runSold) await runBoth();
+                    if (runActive && runSold) await runMode("both");
                     else if (runActive) await runMode("active");
                     else if (runSold) await runMode("sold");
                   }}
@@ -1396,8 +1450,8 @@ export default function MyNextFastAPIApp() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <FullscreenCard title="Active listings" maxWidthClass="max-w-7xl">
                         {({ fullscreen }) =>
-                          activeData?.example_listings?.length ? (
-                            <ExampleListingsList listings={activeData.example_listings} fullscreen={fullscreen} />
+                          activeData?.active_listings?.length ? (
+                            <ExampleListingsList listings={activeData.active_listings} fullscreen={fullscreen} />
                           ) : (
                             <div className="text-sm text-slate-600 dark:text-slate-300">
                               {activeLoading ? "Loading active…" : "Run Active to see examples."}
@@ -1408,8 +1462,8 @@ export default function MyNextFastAPIApp() {
 
                       <FullscreenCard title="Sold listings" maxWidthClass="max-w-7xl">
                         {({ fullscreen }) =>
-                          soldData?.example_listings?.length ? (
-                            <ExampleListingsList listings={soldData.example_listings} fullscreen={fullscreen} />
+                          soldData?.sold_listings?.length ? (
+                            <ExampleListingsList listings={soldData.sold_listings} fullscreen={fullscreen} />
                           ) : (
                             <div className="text-sm text-slate-600 dark:text-slate-300">
                               {soldLoading ? "Loading sold…" : "Run Sold to see examples."}

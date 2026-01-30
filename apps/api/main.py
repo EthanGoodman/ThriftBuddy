@@ -173,12 +173,11 @@ async def fetch_initial_serp_results(*, query: str, mode: str) -> Tuple[Optional
         tasks = []
         if mode in ("active", "both"):
             tasks.append(serp_search(http, q=query, sold=False))
-        if mode in ("sold", "both"):
+        if mode == "sold" and mode != "both":
             tasks.append(serp_search(http, q=query, sold=True))
 
         results = await asyncio.gather(*tasks)
-
-    if mode == "active":
+    if mode in ("active", "both"):
         return results[0], None
     if mode == "sold":
         return None, results[0]
@@ -296,165 +295,8 @@ async def fetch_final_candidates(
         "sold_items_ref": sold_items_ref,
     }
 
-
-
-@app.post("/api/py/extract-file")
-async def extract_from_files(
-    main_image: UploadFile = File(...),
-    files: List[UploadFile] = File([]),
-    itemName: Optional[str] = Form(None),
-    text: Optional[str] = Form(None),
-    mode: str = Form("active"),  # "active" | "sold" | "both"
-    include_debug: bool = Form(False),
-):
-    t0 = time.time()
-    mode = normalize_mode(mode)
-
-    try:
-        # 1) Read images
-        main_bytes, extra_bytes = await image_processing.read_images(main_image, files)
-
-        # 2) Embed main image (always needed)
-        main_vecs = await image_processing.embed_main_image(main_bytes)
-
-        initial_time = time.time()
-        # 3) Initial query (text-first else LLM)
-        query, used_llm, _extracted = await get_initial_query(
-            itemName=itemName,
-            text=text,
-            main_image=main_image,
-            main_bytes=main_bytes,
-            files=files,
-            extra_bytes=extra_bytes,
-        )
-        print("LLM: ", time.time() - initial_time)
-
-        # 4) Initial Serp results
-        serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
-        active_items = extract_items(serp_active)
-        sold_items = extract_items(serp_sold)
-
-        initial_time = time.time()
-        # 5) Embed a small subset of thumbnails
-        await image_processing.embed_initial_thumbnails_if_needed(active_items=active_items, sold_items=sold_items, mode=mode)
-
-        # 6) Rerank for similarity signal
-        active_ranked, sold_ranked = rerank_initial_for_signal(
-            active_items=active_items, sold_items=sold_items, main_vecs=main_vecs, mode=mode
-        )
-        print("Image embedding and reranking: ", time.time() - initial_time)
-
-        initial_time = time.time()
-        # 7) Refine query if confident (based on image similarity)
-        refined_query = await query_refining.refine_query_if_confident(
-            original_query=query,
-            active_items=active_items,
-            sold_items=sold_items,
-            main_vecs=main_vecs,
-        )
-
-        # 7.5) If user text was weak (no refined_query), fallback to LLM
-        fallback_llm_query = await maybe_fallback_to_llm_when_text_fails(
-            original_text=text,
-            refined_query=refined_query,
-            main_image=main_image,
-            main_bytes=main_bytes,
-            files=files,
-            extra_bytes=extra_bytes,
-        )
-
-        if fallback_llm_query:
-            print("here")
-            query = fallback_llm_query
-            used_llm = True
-
-            serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
-            active_items = extract_items(serp_active)
-            sold_items = extract_items(serp_sold)
-
-            await image_processing.embed_initial_thumbnails_if_needed(active_items=active_items, sold_items=sold_items, mode=mode)
-            active_ranked, sold_ranked = rerank_initial_for_signal(
-                active_items=active_items, sold_items=sold_items, main_vecs=main_vecs, mode=mode
-            )
-            refined_query = await query_refining.refine_query_if_confident(
-                original_query=query,
-                active_items=active_items,
-                sold_items=sold_items,
-                main_vecs=main_vecs,
-            )
-
-        # 8) Final candidates (refined if exists, else initial)
-        final_candidates = await fetch_final_candidates(
-            mode=mode,
-            refined_query=refined_query,
-            initial_active_items=active_items,
-            initial_sold_items=sold_items,
-            main_vecs=main_vecs,
-        )
-
-        if refined_query:
-            active_ranked = final_candidates.get("active_ranked") or active_ranked
-            sold_ranked = final_candidates.get("sold_ranked") or sold_ranked
-            active_items = final_candidates.get("active_items_ref") or active_items
-            sold_items = final_candidates.get("sold_items_ref") or sold_items
-
-        print("Refining search: ", time.time() - initial_time)
-
-        # Strip heavy fields before returning
-        if active_ranked and active_ranked.get("filtered_items"):
-            output_builder.strip_heavy_fields(active_items, active_ranked["filtered_items"])
-        else:
-            output_builder.strip_heavy_fields(active_items)
-
-        if sold_ranked and sold_ranked.get("filtered_items"):
-            output_builder.strip_heavy_fields(sold_items, sold_ranked["filtered_items"])
-        else:
-            output_builder.strip_heavy_fields(sold_items)
-
-        # ✅ Frontend-friendly payload ONLY
-        frontend = output_builder.build_frontend_payload(
-            mode=mode,
-            initial_query=query,
-            refined_query=refined_query,
-            active_ranked=active_ranked,
-            sold_ranked=sold_ranked,
-        )
-        frontend["timing_sec"] = round(time.time() - t0, 3)
-
-        # ✅ Debug payload on demand
-        if include_debug:
-            debug = output_builder.build_response(
-                mode=mode,
-                main_vecs=main_vecs,
-                initial_query=query,
-                refined_query=refined_query,
-                active_ranked=active_ranked,
-                sold_ranked=sold_ranked,
-                final_candidates=final_candidates,
-                used_llm=used_llm,
-            )
-            debug["timing_sec"] = frontend["timing_sec"]
-            print(output_builder.json_sanitize({"data": frontend, "debug": debug}))
-            return JSONResponse(output_builder.json_sanitize({"data": frontend, "debug": debug}))
-
-        return JSONResponse(output_builder.json_sanitize(frontend))
-
-    except HTTPException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content=e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)},
-        )
-    except httpx.TimeoutException as e:
-        return JSONResponse(status_code=504, content={"error": "Timeout during marketplace query", "detail": str(e)})
-    except httpx.HTTPError as e:
-        return JSONResponse(status_code=502, content={"error": "HTTP error during marketplace query", "detail": str(e)})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": "Unhandled server error", "detail": str(e)})
-
-
 def _ndjson(obj: Any) -> str:
     return json.dumps(output_builder.json_sanitize(obj)) + "\n"
-
 
 @app.post("/api/py/extract-file-stream")
 async def extract_from_files_stream(
@@ -485,6 +327,7 @@ async def extract_from_files_stream(
             # --- STEP 1: Generating marketplace query ---
             async for chunk in emit("gen_query", "Generating marketplace query", "start", 0.02):
                 yield chunk
+            print("1")
 
             # read + embed main are part of query generation "prep"
             main_bytes, extra_bytes = await image_processing.read_images(main_image, files)
@@ -498,23 +341,25 @@ async def extract_from_files_stream(
                 files=files,
                 extra_bytes=extra_bytes,
             )
+            print("2")
 
-            async for chunk in emit("gen_query", "Generating marketplace query", "done", 0.25, detail=("used LLM" if used_llm else "used input")):
+            async for chunk in emit("gen_query", "Generating marketplace query", "done", 0.18, detail=("used LLM" if used_llm else "used input")):
                 yield chunk
 
             # --- STEP 2: Querying marketplaces (initial) ---
-            async for chunk in emit("query_mkt", "Querying marketplaces", "start", 0.28):
+            async for chunk in emit("query_mkt", "Querying marketplaces", "start", 0.20):
                 yield chunk
 
             serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
             active_items = extract_items(serp_active)
             sold_items = extract_items(serp_sold)
+            print("3")
 
-            async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0.50, detail=f"active={len(active_items)} sold={len(sold_items)}"):
+            async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0., detail=f"active={len(active_items)} sold={len(sold_items)}"):
                 yield chunk
 
             # --- STEP 3: Processing item images (embed thumbs + rerank) ---
-            async for chunk in emit("proc_imgs", "Processing item images", "start", 0.52):
+            async for chunk in emit("proc_imgs", "Processing item images", "start", 0.32):
                 yield chunk
 
             await image_processing.embed_initial_thumbnails_if_needed(
@@ -523,6 +368,8 @@ async def extract_from_files_stream(
                 mode=mode
             )
 
+            print("4")
+
             active_ranked, sold_ranked = rerank_initial_for_signal(
                 active_items=active_items,
                 sold_items=sold_items,
@@ -530,11 +377,13 @@ async def extract_from_files_stream(
                 mode=mode
             )
 
-            async for chunk in emit("proc_imgs", "Processing item images", "done", 0.75):
+            print("5")
+
+            async for chunk in emit("proc_imgs", "Processing item images", "done", 0.65):
                 yield chunk
 
             # --- STEP 4: Refining search query ---
-            async for chunk in emit("refine", "Refining search query", "start", 0.78):
+            async for chunk in emit("refine", "Refining search query", "start", 0.67):
                 yield chunk
 
             refined_query = await query_refining.refine_query_if_confident(
@@ -543,6 +392,8 @@ async def extract_from_files_stream(
                 sold_items=sold_items,
                 main_vecs=main_vecs,
             )
+
+            print("6")
 
             # optional fallback (still within refine step)
             fallback_llm_query = await maybe_fallback_to_llm_when_text_fails(
@@ -553,6 +404,8 @@ async def extract_from_files_stream(
                 files=files,
                 extra_bytes=extra_bytes,
             )
+
+            print("6")
 
             if fallback_llm_query:
                 query = fallback_llm_query
@@ -573,13 +426,14 @@ async def extract_from_files_stream(
                     sold_items=sold_items,
                     main_vecs=main_vecs,
                 )
+            print("7")
 
-            async for chunk in emit("refine", "Refining search query", "done", 0.88, detail=(refined_query or "no refinement")):
+            async for chunk in emit("refine", "Refining search query", "done", 0.80, detail=(refined_query or "no refinement")):
                 yield chunk
 
             # --- STEP 5: Re-querying marketplaces (only if refined_query exists) ---
             if refined_query:
-                async for chunk in emit("requery", "Re-querying marketplaces", "start", 0.90):
+                async for chunk in emit("requery", "Re-querying marketplaces", "start", 0.82):
                     yield chunk
 
             final_candidates = await fetch_final_candidates(
@@ -589,6 +443,8 @@ async def extract_from_files_stream(
                 initial_sold_items=sold_items,
                 main_vecs=main_vecs,
             )
+
+            print("8")
 
             if refined_query:
                 async for chunk in emit("requery", "Re-querying marketplaces", "done", 0.98):
@@ -621,6 +477,9 @@ async def extract_from_files_stream(
                 active_ranked=active_ranked,
                 sold_ranked=sold_ranked,
             )
+
+            print("9")
+            
             frontend["timing_sec"] = round(time.time() - t0, 3)
 
             yield _ndjson({"type": "result", "data": frontend})
