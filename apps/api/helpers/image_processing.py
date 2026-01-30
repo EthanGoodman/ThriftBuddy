@@ -49,51 +49,66 @@ async def embed_thumbnails_for_items(
     *,
     max_items: int = 50,
     concurrency: int = 10,
+    batch_size: int = 10,
 ) -> Dict[str, Any]:
-    """
-    For the first `max_items` items:
-      - downloads thumbnail bytes
-      - computes CLIP embedding (normalized)
-      - caches by product_id (preferred) or thumbnail URL
-    Mutates each item by attaching:
-      item["_thumb_embed_status"] = "ok" | "no_thumbnail" | "download_failed" | "embed_failed"
-      item["_thumb_embedding"] = [floats]   (only if ok)
-    Returns a small summary.
-    """
     target_items = items[:max_items]
-
     sem = asyncio.Semaphore(concurrency)
 
     async with httpx.AsyncClient() as http:
-        async def process_item(it: Dict[str, Any]) -> None:
+        async def download_one(it: Dict[str, Any]) -> Tuple[Dict[str, Any], Optional[bytes], Optional[str]]:
             thumb_url = it.get("thumbnail")
             if not isinstance(thumb_url, str) or not thumb_url.strip():
                 it["_thumb_embed_status"] = "no_thumbnail"
-                return
+                return it, None, None
 
             cache_key = str(it.get("product_id") or thumb_url)
             cached = _THUMB_EMBED_CACHE.get(cache_key)
             if cached is not None:
                 it["_thumb_embedding"] = cached
                 it["_thumb_embed_status"] = "ok_cached"
-                return
+                return it, None, cache_key  # None bytes => no embed needed
 
             async with sem:
                 img_bytes = await fetch_image_bytes(thumb_url, http)
 
             if img_bytes is None:
                 it["_thumb_embed_status"] = "download_failed"
-                return
+                return it, None, None
 
-            try:
-                vecs = await clip_embed_bytes(img_bytes, crops=[1.0, 0.85])
-                _THUMB_EMBED_CACHE[cache_key] = vecs
-                it["_thumb_embedding"] = vecs
-                it["_thumb_embed_status"] = "ok"
-            except Exception:
+            return it, img_bytes, cache_key
+
+        downloaded = await asyncio.gather(*(download_one(it) for it in target_items))
+
+        # Build batch list for those that actually need embedding
+        to_embed_items: List[Dict[str, Any]] = []
+        to_embed_bytes: List[bytes] = []
+        to_embed_keys: List[str] = []
+
+        for it, b, cache_key in downloaded:
+            if b is None:
+                continue
+            if not cache_key:
                 it["_thumb_embed_status"] = "embed_failed"
+                continue
+            to_embed_items.append(it)
+            to_embed_bytes.append(b)
+            to_embed_keys.append(cache_key)
 
-        await asyncio.gather(*(process_item(it) for it in target_items))
+        # One shared client for all /embed_batch calls
+        async with httpx.AsyncClient(timeout=30.0) as clip_client:
+            embeds = await clip_embed_batch_bytes(
+                to_embed_bytes,
+                client=clip_client,
+                batch_size=batch_size,
+            )
+
+        for it, cache_key, vecs in zip(to_embed_items, to_embed_keys, embeds):
+            if vecs is None:
+                it["_thumb_embed_status"] = "embed_failed"
+                continue
+            _THUMB_EMBED_CACHE[cache_key] = vecs
+            it["_thumb_embedding"] = vecs
+            it["_thumb_embed_status"] = "ok"
 
     # summary counts
     counts: Dict[str, int] = {}
@@ -102,6 +117,7 @@ async def embed_thumbnails_for_items(
         counts[s] = counts.get(s, 0) + 1
 
     return {"processed": len(target_items), "status_counts": counts}
+
 
 async def fetch_image_bytes(url: str, http: httpx.AsyncClient) -> Optional[bytes]:
     """
@@ -123,5 +139,42 @@ async def clip_embed_bytes(img_bytes: bytes, *, crops: List[float]) -> List[List
         r = await client.post(f"{CLIP_URL}/embed", files=files)
         r.raise_for_status()
         return r.json()["embeddings"]
+
+async def clip_embed_batch_bytes(
+    images: List[bytes],
+    *,
+    client: httpx.AsyncClient,
+    batch_size: int = 10,
+) -> List[Optional[List[List[float]]]]:
+    """
+    Calls /embed_batch in chunks. Returns list aligned to `images` where each entry is:
+      - embeddings (List[List[float]]) on success
+      - None on failure for that image
+    """
+    out: List[Optional[List[List[float]]]] = []
+
+    for i in range(0, len(images), batch_size):
+        chunk = images[i : i + batch_size]
+
+        # IMPORTANT: repeated field name "images"
+        files = [
+            ("images", (f"image_{i+j}.jpg", b, "image/jpeg"))
+            for j, b in enumerate(chunk)
+        ]
+
+        r = await client.post(f"{CLIP_URL}/embed_batch", files=files)
+        r.raise_for_status()
+        payload = r.json()
+
+        # Your clip service returns: {"results": [{"ok": bool, "embeddings": [...]}, ...], "crops": [...]}
+        results = payload.get("results", [])
+        for item in results:
+            if item.get("ok"):
+                out.append(item.get("embeddings") or [])
+            else:
+                out.append(None)
+
+    return out
+
 
     
