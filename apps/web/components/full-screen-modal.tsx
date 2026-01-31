@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from "react";
 import { Card } from "@/app/(protected)/app/page"
+import { createPortal } from "react-dom";
 
 
 const UTILITY_BTN_CLASS =
@@ -37,38 +38,42 @@ export function FullscreenCard({
         {children({ fullscreen: false })}
       </Card>
 
-      {open ? (
-        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-          <button
-            type="button"
-            aria-label="Close fullscreen"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-black/60"
-          />
+      {open && typeof window !== "undefined"
+  ? createPortal(
+      <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+        <button
+          type="button"
+          aria-label="Close fullscreen"
+          onClick={() => setOpen(false)}
+          className="absolute inset-0 bg-black/60"
+        />
 
-          <div className="absolute inset-0 p-4 sm:p-8">
-            <div
-              className={[
-                "mx-auto h-full rounded-2xl bg-white shadow-xl ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/10 flex flex-col",
-                maxWidthClass,
-              ].join(" ")}
-            >
-              <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 dark:border-slate-800/70 px-5 py-4">
-                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-                <button type="button" onClick={() => setOpen(false)} className={UTILITY_BTN_CLASS}>
-                  Close
-                </button>
-              </div>
+        <div className="absolute inset-0 p-4 sm:p-8">
+          <div
+            className={[
+              "mx-auto h-full rounded-2xl bg-white shadow-xl ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/10 flex flex-col",
+              maxWidthClass,
+            ].join(" ")}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 dark:border-slate-800/70 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+              <button type="button" onClick={() => setOpen(false)} className={UTILITY_BTN_CLASS}>
+                Close
+              </button>
+            </div>
 
-              <div className="flex-1 min-h-0 overflow-auto p-5">
-                {children({ fullscreen: true })}
-              </div>
+            <div className="flex-1 min-h-0 overflow-auto p-5">
+              {children({ fullscreen: true })}
             </div>
           </div>
-
-          <EscToClose onClose={() => setOpen(false)} />
         </div>
-      ) : null}
+
+        <EscToClose onClose={() => setOpen(false)} />
+      </div>,
+      document.body
+    )
+  : null}
+
     </>
   );
 }

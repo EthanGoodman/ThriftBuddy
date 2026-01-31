@@ -136,6 +136,49 @@ function PriceSummaryCombined({
   );
 }
 
+function ListingRemoveX({
+  onClick,
+  ariaLabel,
+  title = "Remove",
+}: {
+  onClick: (e: React.MouseEvent) => void;
+  ariaLabel: string;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={title}
+      className={[
+        "absolute top-2 right-2 z-10",
+        "inline-flex items-center justify-center",
+        "h-6 w-6 rounded-md", // click target
+        "bg-transparent",
+        // icon color
+        "text-slate-400 hover:text-slate-900 dark:text-slate-500 dark:hover:text-slate-100",
+        // optional subtle hover hitbox (remove if you want fully invisible)
+        "hover:bg-slate-900/5 dark:hover:bg-white/10",
+        "active:scale-95 transition",
+        // important: only show ring for keyboard focus
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
+        "focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900",
+      ].join(" ")}
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+        <path
+          d="M6 6l12 12M18 6L6 18"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+
 function StepColumn({
   title,
   steps,
@@ -292,21 +335,99 @@ function CheckboxChip({
   );
 }
 
+function getVisiblePricedListings(
+  listings: ExampleListing[] | undefined,
+  dismissed: Set<string>
+) {
+  if (!listings?.length) return [];
+
+  return listings
+    .map((it, idx) => ({ it, idx, key: listingKey(it, idx) }))
+    .filter(({ it }) => it.price?.extracted != null)
+    .filter(({ key }) => !dismissed.has(key));
+}
+
+function medianOfSorted(nums: number[]) {
+  const n = nums.length;
+  if (!n) return null;
+  const mid = Math.floor(n / 2);
+  if (n % 2 === 1) return nums[mid];
+  return (nums[mid - 1] + nums[mid]) / 2;
+}
+
+function computePriceRangeFromListings(
+  listings: ExampleListing[] | undefined,
+  dismissed: Set<string>
+): PriceRange {
+  const visible = getVisiblePricedListings(listings, dismissed);
+  const prices = visible
+    .map(({ it }) => it.price!.extracted!)
+    .filter((x) => x != null && !Number.isNaN(x))
+    .sort((a, b) => a - b);
+
+  const n = prices.length;
+  if (!n) return null;
+
+  const low = prices[0];
+  const high = prices[n - 1];
+  const median = medianOfSorted(prices);
+
+  // Quartiles: median of lower half / upper half (excluding median when odd)
+  let q1: number | null = null;
+  let q3: number | null = null;
+
+  if (n >= 4) {
+    const mid = Math.floor(n / 2);
+    const lower = prices.slice(0, mid);
+    const upper = prices.slice(n % 2 === 0 ? mid : mid + 1);
+    q1 = medianOfSorted(lower);
+    q3 = medianOfSorted(upper);
+  }
+
+  return {
+    n,
+    low,
+    q1,
+    median,
+    q3,
+    high,
+  };
+}
+
+
+function listingKey(it: ExampleListing, idx: number) {
+  // Prefer stable unique fields if present
+  return (
+    it.product_id ??
+    it.link ??
+    `${it.title ?? "untitled"}|${it.price?.extracted ?? it.price?.raw ?? "noprice"}|${idx}`
+  );
+}
 
 function ExampleListingsList({
   listings,
   fullscreen,
+  dismissedKeys,
+  onDismiss,
 }: {
   listings: ExampleListing[];
   fullscreen: boolean;
+  dismissedKeys: Set<string>;
+  onDismiss: (key: string) => void;
 }) {
   const items = listings
-    .filter((it) => it.price?.extracted != null)
-    .sort((a, b) => a.price!.extracted! - b.price!.extracted!)
+    .map((it, idx) => ({ it, idx, key: listingKey(it, idx) }))
+    .filter(({ it }) => it.price?.extracted != null)
+    .filter(({ key }) => !dismissedKeys.has(key))
+    .sort((a, b) => a.it.price!.extracted! - b.it.price!.extracted!)
     .slice(0, 51);
 
   if (!items.length) {
-    return <div className="text-sm text-slate-600 dark:text-slate-300">No example listings available.</div>;
+    return (
+      <div className="text-sm text-slate-600 dark:text-slate-300">
+        No example listings available.
+      </div>
+    );
   }
 
   return (
@@ -317,17 +438,26 @@ function ExampleListingsList({
       ].join(" ")}
     >
       <div className="grid gap-4 grid-cols-1">
-        {items.map((it, idx) => (
+        {items.map(({ it, key }) => (
           <a
-            key={(it.product_id ?? "") + idx}
+            key={key}
             href={it.link || "#"}
             target="_blank"
             rel="noreferrer"
             className={[
-              "group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 transition dark:bg-slate-900",
-              fullscreen ? "p-4" : "p-3",
+              "group relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 transition dark:bg-slate-900",
+              fullscreen ? "py-4 pl-4 pr-10" : "py-3 pl-3 pr-9",
             ].join(" ")}
           >
+            <ListingRemoveX
+              ariaLabel="Remove listing"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDismiss(key);
+              }}
+            />
+
             <div className="flex gap-4">
               <div
                 className={[
@@ -377,6 +507,7 @@ function ExampleListingsList({
     </div>
   );
 }
+
 
 function truncate(s: string, n: number) {
   const t = s.trim();
@@ -537,39 +668,86 @@ export default function MyNextFastAPIApp() {
 
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
+  const [dismissedActive, setDismissedActive] = useState<Set<string>>(() => new Set());
+  const [dismissedSold, setDismissedSold] = useState<Set<string>>(() => new Set());
+
+  const dismissActive = (key: string) =>
+    setDismissedActive((prev) => new Set(prev).add(key));
+
+  const dismissSold = (key: string) =>
+    setDismissedSold((prev) => new Set(prev).add(key));
+
+  
+
+
   // Structured results per mode
   const [activeData, setActiveData] = useState<FrontendPayload | null>(null);
   const [soldData, setSoldData] = useState<FrontendPayload | null>(null);
+  const derivedActiveRange = useMemo(
+    () => computePriceRangeFromListings(activeData?.active_listings, dismissedActive),
+    [activeData?.active_listings, dismissedActive]
+  );
+
+  const derivedSoldRange = useMemo(
+    () => computePriceRangeFromListings(soldData?.sold_listings, dismissedSold),
+    [soldData?.sold_listings, dismissedSold]
+  );
+
+  const derivedActiveCount = useMemo(() => {
+    return getVisiblePricedListings(activeData?.active_listings, dismissedActive).length;
+  }, [activeData?.active_listings, dismissedActive]);
+
+  const derivedSoldCount = useMemo(() => {
+    return getVisiblePricedListings(soldData?.sold_listings, dismissedSold).length;
+  }, [soldData?.sold_listings, dismissedSold]);
   const combinedData = useMemo(() => {
     if (!activeData && !soldData) return null;
 
     const base = activeData ?? soldData!;
+    const baseMA = base.market_analysis;
+
+    // build combined market_analysis, but override price_range + similar_count
+    const mergedMA = {
+      active: {
+        similar_count: derivedActiveCount,
+        price_range: derivedActiveRange,
+      },
+      sold: {
+        similar_count: derivedSoldCount,
+        price_range: derivedSoldRange,
+      },
+      sell_velocity:
+        activeData?.market_analysis.sell_velocity ??
+        soldData?.market_analysis.sell_velocity ??
+        baseMA.sell_velocity ??
+        "unknown",
+      rarity:
+        activeData?.market_analysis.rarity ??
+        soldData?.market_analysis.rarity ??
+        baseMA.rarity ??
+        "unknown",
+    };
 
     return {
       ...base,
       mode: "both",
-
-      market_analysis: {
-        active: activeData?.market_analysis.active ?? { similar_count: 0, price_range: null },
-        sold: soldData?.market_analysis.sold ?? { similar_count: 0, price_range: null },
-        sell_velocity:
-          activeData?.market_analysis.sell_velocity ??
-          soldData?.market_analysis.sell_velocity ??
-          "unknown",
-        rarity:
-          activeData?.market_analysis.rarity ??
-          soldData?.market_analysis.rarity ??
-          "unknown",
-      },
-
-      // optional: pick one or merge
+      market_analysis: mergedMA,
       legit_check_advice: base.legit_check_advice ?? [],
       summary: [activeData?.summary, soldData?.summary].filter(Boolean).join("\n\n"),
-
-      // optional timing
-      timing_sec: activeData  && soldData ? Math.round(((activeData?.timing_sec ?? 0)) * 1000) / 1000 : Math.round(((activeData?.timing_sec ?? 0) + (soldData?.timing_sec ?? 0)) * 1000) / 1000,
+      timing_sec:
+        activeData && soldData
+          ? Math.round(((activeData?.timing_sec ?? 0)) * 1000) / 1000
+          : Math.round(((activeData?.timing_sec ?? 0) + (soldData?.timing_sec ?? 0)) * 1000) / 1000,
     };
-  }, [activeData, soldData]);
+  }, [
+    activeData,
+    soldData,
+    derivedActiveRange,
+    derivedSoldRange,
+    derivedActiveCount,
+    derivedSoldCount,
+  ]);
+
 
   const [activeLoading, setActiveLoading] = useState(false);
   const [soldLoading, setSoldLoading] = useState(false);
@@ -637,6 +815,7 @@ export default function MyNextFastAPIApp() {
     }
     return doneCount; // can be STREAM_STEPS.length when fully done
   }
+
 
   const combinedSteps = useMemo<Record<string, StepStatus>>(() => {
     if (!showBoth) return runActive ? activeSteps : soldSteps;
@@ -779,20 +958,22 @@ export default function MyNextFastAPIApp() {
     });
 
     function resetModeForNewRun(mode: Mode) {
-    if (mode === "active") {
-      setActiveError("");
-      setActiveData(null);
-      setActiveProgress(0);
-      setActiveLoading(true); 
-      setActiveSteps(makeInitialStepState());
-    } else {
-      setSoldError("");
-      setSoldData(null);
-      setSoldProgress(0);
-      setSoldLoading(true); 
-      setSoldSteps(makeInitialStepState());
+      if (mode === "active") {
+        setDismissedActive(new Set());
+        setActiveError("");
+        setActiveData(null);
+        setActiveProgress(0);
+        setActiveLoading(true); 
+        setActiveSteps(makeInitialStepState());
+      } else {
+        setDismissedSold(new Set());
+        setSoldError("");
+        setSoldData(null);
+        setSoldProgress(0);
+        setSoldLoading(true); 
+        setSoldSteps(makeInitialStepState());
+      }
     }
-  }
 
   function clearModeCompletely(mode: Mode) {
     // same as reset, but also ensures it won't show "Done" from last time
@@ -812,209 +993,214 @@ export default function MyNextFastAPIApp() {
   }, [lightboxUrl]);
 
   async function runMode(mode: Mode) {
-  if (!mainImage) {
-    const msg = "Please upload a Main Image (full item, straight-on) before sending.";
-    if (mode === "active") setActiveError(msg);
-    else if (mode === "sold") setSoldError(msg);
-    else { // both
-      setActiveError(msg);
-      setSoldError(msg);
+    if (!mainImage) {
+      const msg = "Please upload a Main Image (full item, straight-on) before sending.";
+      if (mode === "active") setActiveError(msg);
+      else if (mode === "sold") setSoldError(msg);
+      else { // both
+        setActiveError(msg);
+        setSoldError(msg);
+      }
+      return;
     }
-    return;
-  }
 
-  setHasRunOnce(true);
-  setCollapseForm(true);
-  setSubmitAttempted(true);
+    setHasRunOnce(true);
+    setCollapseForm(true);
+    setSubmitAttempted(true);
 
-  // clear errors
-  if (mode === "active") setActiveError("");
-  else if (mode === "sold") setSoldError("");
-  else {
-    setActiveError("");
-    setSoldError("");
-  }
-
-  // abort any previous run for this mode
-  if (mode === "active") activeAbortRef.current?.abort();
-  else if (mode === "sold") soldAbortRef.current?.abort();
-  else {
-    activeAbortRef.current?.abort();
-    soldAbortRef.current?.abort();
-  }
-
-  const controller = new AbortController();
-  if (mode === "active") activeAbortRef.current = controller;
-  else if (mode === "sold") soldAbortRef.current = controller;
-  else {
-    activeAbortRef.current = controller;
-    soldAbortRef.current = controller;
-  }
-
-  try {
-    // IMPORTANT: make sure loading is set true somewhere before fetch
-    if (mode === "active") setActiveLoading(true);
-    else if (mode === "sold") setSoldLoading(true);
+    // clear errors
+    if (mode === "active") setActiveError("");
+    else if (mode === "sold") setSoldError("");
     else {
-      setActiveLoading(true);
-      setSoldLoading(true);
+      setActiveError("");
+      setSoldError("");
     }
 
-    const form = new FormData();
-    form.append("main_image", mainImage);
-
-    const prompt = textInput.trim();
-    const item = itemName.trim();
-    if (prompt.length > 0) form.append("text", prompt);
-    if (item.length > 0) form.append("itemName", item);
-
-    const extras = files.filter(Boolean) as File[];
-    for (const f of extras) form.append("files", f);
-
-    form.append("mode", mode);
-
-    const res = await fetch("/api/py/extract-file-stream", {
-      method: "POST",
-      body: form,
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`Request failed: ${res.status}${txt ? ` - ${txt}` : ""}`);
+    // abort any previous run for this mode
+    if (mode === "active") activeAbortRef.current?.abort();
+    else if (mode === "sold") soldAbortRef.current?.abort();
+    else {
+      activeAbortRef.current?.abort();
+      soldAbortRef.current?.abort();
     }
 
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error("No response body stream");
+    const controller = new AbortController();
+    if (mode === "active") activeAbortRef.current = controller;
+    else if (mode === "sold") soldAbortRef.current = controller;
+    else {
+      activeAbortRef.current = controller;
+      soldAbortRef.current = controller;
+    }
 
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    const setProgress = (p: number) => {
-      const clamped = Math.max(0, Math.min(1, p));
-      if (mode === "active") setActiveProgress(clamped);
-      else if (mode === "sold") setSoldProgress(clamped);
+    try {
+      // IMPORTANT: make sure loading is set true somewhere before fetch
+      if (mode === "active") setActiveLoading(true);
+      else if (mode === "sold") setSoldLoading(true);
       else {
-        setActiveProgress(clamped);
-        setSoldProgress(clamped);
+        setActiveLoading(true);
+        setSoldLoading(true);
       }
-    };
 
-    const setStep = (stepId: string, status: StepStatus) => {
-      if (mode === "active") setActiveSteps(prev => ({ ...prev, [stepId]: status }));
-      else if (mode === "sold") setSoldSteps(prev => ({ ...prev, [stepId]: status }));
-      else {
-        setActiveSteps(prev => ({ ...prev, [stepId]: status }));
-        setSoldSteps(prev => ({ ...prev, [stepId]: status }));
+      const form = new FormData();
+      form.append("main_image", mainImage);
+
+      const prompt = textInput.trim();
+      const item = itemName.trim();
+      if (prompt.length > 0) form.append("text", prompt);
+      if (item.length > 0) form.append("itemName", item);
+
+      const extras = files.filter(Boolean) as File[];
+      for (const f of extras) form.append("files", f);
+
+      form.append("mode", mode);
+
+      if (mode === "both") {
+        setDismissedActive(new Set());
+        setDismissedSold(new Set());
       }
-    };
+      
+      const res = await fetch("/api/py/extract-file-stream", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
 
-    const normalizeActives = (currentStepId: string) => {
-      const normalize = (setter: any) => {
-        setter((prev: any) => {
-          const next = { ...prev };
-          for (const k of Object.keys(next)) {
-            if (k !== currentStepId && next[k] === "active") next[k] = "done";
-          }
-          return next;
-        });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Request failed: ${res.status}${txt ? ` - ${txt}` : ""}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      const setProgress = (p: number) => {
+        const clamped = Math.max(0, Math.min(1, p));
+        if (mode === "active") setActiveProgress(clamped);
+        else if (mode === "sold") setSoldProgress(clamped);
+        else {
+          setActiveProgress(clamped);
+          setSoldProgress(clamped);
+        }
       };
 
-      if (mode === "active") normalize(setActiveSteps);
-      else if (mode === "sold") normalize(setSoldSteps);
-      else {
-        normalize(setActiveSteps);
-        normalize(setSoldSteps);
-      }
-    };
-
-    const handleLine = (line: string) => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-
-      let msg: StreamEvent;
-      try {
-        msg = JSON.parse(trimmed);
-      } catch {
-        return; // ignore malformed chunk
-      }
-
-      if (msg.type === "step") {
-        if (msg.pct != null) setProgress(msg.pct);
-
-        if (msg.status === "start") {
-          normalizeActives(msg.step_id);
-          setStep(msg.step_id, "active");
-        } else {
-          setStep(msg.step_id, "done");
-        }
-      }
-
-      if (msg.type === "error") {
-        throw new Error(parseStreamError(msg.error));
-      }
-
-      if (msg.type === "result") {
-        const payload = msg.data;
-
-        if (mode === "active") setActiveData(payload);
-        else if (mode === "sold") setSoldData(payload);
+      const setStep = (stepId: string, status: StepStatus) => {
+        if (mode === "active") setActiveSteps(prev => ({ ...prev, [stepId]: status }));
+        else if (mode === "sold") setSoldSteps(prev => ({ ...prev, [stepId]: status }));
         else {
-          // payload contains both in one response
-          setActiveData(payload);
-          setSoldData(payload);
+          setActiveSteps(prev => ({ ...prev, [stepId]: status }));
+          setSoldSteps(prev => ({ ...prev, [stepId]: status }));
         }
+      };
 
-        setProgress(1);
-
-        const markDone = (setter: any) => {
+      const normalizeActives = (currentStepId: string) => {
+        const normalize = (setter: any) => {
           setter((prev: any) => {
             const next = { ...prev };
-            for (const k of Object.keys(next)) if (next[k] === "active") next[k] = "done";
+            for (const k of Object.keys(next)) {
+              if (k !== currentStepId && next[k] === "active") next[k] = "done";
+            }
             return next;
           });
         };
 
-        if (mode === "active") markDone(setActiveSteps);
-        else if (mode === "sold") markDone(setSoldSteps);
+        if (mode === "active") normalize(setActiveSteps);
+        else if (mode === "sold") normalize(setSoldSteps);
         else {
-          markDone(setActiveSteps);
-          markDone(setSoldSteps);
+          normalize(setActiveSteps);
+          normalize(setSoldSteps);
         }
+      };
+
+      const handleLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        let msg: StreamEvent;
+        try {
+          msg = JSON.parse(trimmed);
+        } catch {
+          return; // ignore malformed chunk
+        }
+
+        if (msg.type === "step") {
+          if (msg.pct != null) setProgress(msg.pct);
+
+          if (msg.status === "start") {
+            normalizeActives(msg.step_id);
+            setStep(msg.step_id, "active");
+          } else {
+            setStep(msg.step_id, "done");
+          }
+        }
+
+        if (msg.type === "error") {
+          throw new Error(parseStreamError(msg.error));
+        }
+
+        if (msg.type === "result") {
+          const payload = msg.data;
+
+          if (mode === "active") setActiveData(payload);
+          else if (mode === "sold") setSoldData(payload);
+          else {
+            // payload contains both in one response
+            setActiveData(payload);
+            setSoldData(payload);
+          }
+
+          setProgress(1);
+
+          const markDone = (setter: any) => {
+            setter((prev: any) => {
+              const next = { ...prev };
+              for (const k of Object.keys(next)) if (next[k] === "active") next[k] = "done";
+              return next;
+            });
+          };
+
+          if (mode === "active") markDone(setActiveSteps);
+          else if (mode === "sold") markDone(setSoldSteps);
+          else {
+            markDone(setActiveSteps);
+            markDone(setSoldSteps);
+          }
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) handleLine(line);
       }
-    };
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+      const tail = buffer.trim();
+      if (tail) handleLine(tail);
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) handleLine(line);
-    }
-
-    const tail = buffer.trim();
-    if (tail) handleLine(tail);
-
-  } catch (e: any) {
-    const msg = e?.name === "AbortError" ? "Cancelled." : (e?.message ?? "Unknown error");
-    if (mode === "active") setActiveError(msg);
-    else if (mode === "sold") setSoldError(msg);
-    else {
-      setActiveError(msg);
-      setSoldError(msg);
-    }
-  } finally {
-    if (mode === "active") setActiveLoading(false);
-    else if (mode === "sold") setSoldLoading(false);
-    else {
-      setActiveLoading(false);
-      setSoldLoading(false);
+    } catch (e: any) {
+      const msg = e?.name === "AbortError" ? "Cancelled." : (e?.message ?? "Unknown error");
+      if (mode === "active") setActiveError(msg);
+      else if (mode === "sold") setSoldError(msg);
+      else {
+        setActiveError(msg);
+        setSoldError(msg);
+      }
+    } finally {
+      if (mode === "active") setActiveLoading(false);
+      else if (mode === "sold") setSoldLoading(false);
+      else {
+        setActiveLoading(false);
+        setSoldLoading(false);
+      }
     }
   }
-}
 
 
   function Thumb({
@@ -1451,7 +1637,13 @@ export default function MyNextFastAPIApp() {
                       <FullscreenCard title="Active listings" maxWidthClass="max-w-7xl">
                         {({ fullscreen }) =>
                           activeData?.active_listings?.length ? (
-                            <ExampleListingsList listings={activeData.active_listings} fullscreen={fullscreen} />
+                            <ExampleListingsList
+                              listings={activeData.active_listings}
+                              fullscreen={fullscreen}
+                              dismissedKeys={dismissedActive}
+                              onDismiss={dismissActive}
+                            />
+
                           ) : (
                             <div className="text-sm text-slate-600 dark:text-slate-300">
                               {activeLoading ? "Loading active…" : "Run Active to see examples."}
@@ -1463,7 +1655,12 @@ export default function MyNextFastAPIApp() {
                       <FullscreenCard title="Sold listings" maxWidthClass="max-w-7xl">
                         {({ fullscreen }) =>
                           soldData?.sold_listings?.length ? (
-                            <ExampleListingsList listings={soldData.sold_listings} fullscreen={fullscreen} />
+                            <ExampleListingsList
+                              listings={soldData.sold_listings}
+                              fullscreen={fullscreen}
+                              dismissedKeys={dismissedSold}
+                              onDismiss={dismissSold}
+                            />
                           ) : (
                             <div className="text-sm text-slate-600 dark:text-slate-300">
                               {soldLoading ? "Loading sold…" : "Run Sold to see examples."}
@@ -1478,7 +1675,7 @@ export default function MyNextFastAPIApp() {
           </div>
           
           {/* RIGHT */}
-          <div className="sticky top-10 self-start">
+          <div className="sticky top-24 self-start">
             {!mainPreview && extraPreviews.length === 0 ? (
               <div className="text-sm text-slate-500">No images selected yet.</div>
             ) : (
