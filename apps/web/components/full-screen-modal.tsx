@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useState } from "react";
-import { Card } from "@/app/(protected)/app/page"
+import { Card } from "@/components/Card"
 import { createPortal } from "react-dom";
 
 
