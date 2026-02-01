@@ -640,7 +640,7 @@ export default function MyNextFastAPIApp() {
             onRemove();
           }}
           className="absolute top-1 right-1 z-10 rounded-md
-                    bg-red-500/60 text-white
+                    bg-black/60 text-white
                     hover:bg-red-600/80 focus:outline-none
                     focus:ring-2 focus:ring-white/50 aspect-square w-[20px]
                     flex items-center justify-center leading-none"
