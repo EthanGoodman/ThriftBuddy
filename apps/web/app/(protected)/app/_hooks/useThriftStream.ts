@@ -29,6 +29,8 @@ export function useThriftStream({
   runActive,
   runSold,
 }: UseThriftStreamParams) {
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL!;
+
   const [dismissedActive, setDismissedActive] = useState<Set<string>>(() => new Set());
   const [dismissedSold, setDismissedSold] = useState<Set<string>>(() => new Set());
 
@@ -249,7 +251,7 @@ export function useThriftStream({
         setDismissedSold(new Set());
       }
 
-      const res = await fetch("/api/py/extract-file-stream", {
+      const res = await fetch(`${API}/extract-file-stream`, {
         method: "POST",
         body: form,
         signal: controller.signal,

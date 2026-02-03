@@ -300,7 +300,7 @@ async def fetch_final_candidates(
 def _ndjson(obj: Any) -> str:
     return json.dumps(output_builder.json_sanitize(obj)) + "\n"
 
-@app.post("/api/py/extract-file-stream")
+@app.post("/extract-file-stream")
 async def extract_from_files_stream(
     main_image: UploadFile = File(...),
     files: List[UploadFile] = File([]),
@@ -581,7 +581,7 @@ async def fetch_serp_results_lens(*, query: str, mode: str) -> Tuple[Optional[di
         return None, results[0]
     return results[0], results[1]
 
-@app.post("/api/py/extract-file-stream-lens")
+@app.post("/extract-file-stream-lens")
 async def extract_file_stream_lens_simple(
     main_image: UploadFile = File(...),
     files: List[UploadFile] = File([]),
