@@ -6,6 +6,8 @@ from PIL import Image
 import torch
 import open_clip
 import asyncio
+from pydantic import BaseModel, HttpUrl
+import httpx
 
 app = FastAPI()
 
@@ -13,6 +15,31 @@ _CLIP_MODEL = None
 _CLIP_PREPROCESS = None
 _CLIP_DEVICE = "cpu"
 MAIN_CROPS = [1.0, 0.85]
+
+class Candidate(BaseModel):
+    title: str
+    image: HttpUrl
+
+class BestMatchRequest(BaseModel):
+    query_image: HttpUrl
+    candidates: List[Candidate]
+
+def _avg_vec(vecs: List[List[float]]) -> List[float]:
+    if not vecs:
+        return []
+    dim = len(vecs[0])
+    out = [0.0] * dim
+    for v in vecs:
+        for i, x in enumerate(v):
+            out[i] += x
+    out = [x / len(vecs) for x in out]
+    norm = sum(x * x for x in out) ** 0.5
+    return [x / norm for x in out] if norm else out
+
+def _dot(a: List[float], b: List[float]) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
+
 
 def _load_clip():
     global _CLIP_MODEL, _CLIP_PREPROCESS
@@ -91,3 +118,34 @@ async def embed_batch(images: List[UploadFile] = File(...)):
 
     return {"results": results, "crops": MAIN_CROPS}
 
+@app.post("/best_match")
+async def best_match(req: BestMatchRequest):
+    if not req.candidates:
+        raise HTTPException(status_code=400, detail="No candidates provided")
+    if len(req.candidates) > 10:
+        raise HTTPException(status_code=400, detail="Max 10 candidates")
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as http:
+        # ---- embed query image ----
+        q_img = await http.get(str(req.query_image))
+        q_img.raise_for_status()
+        q_vecs = image_bytes_to_embeddings_multicrop(q_img.content, MAIN_CROPS)
+        q = _avg_vec(q_vecs)
+
+        best = {"title": None, "score": -1.0}
+
+        # ---- embed candidates ----
+        for c in req.candidates:
+            r = await http.get(str(c.image))
+            r.raise_for_status()
+            vecs = image_bytes_to_embeddings_multicrop(r.content, MAIN_CROPS)
+            v = _avg_vec(vecs)
+            score = _dot(q, v)
+
+            if score > best["score"]:
+                best = {"title": c.title, "score": score}
+
+    return {
+        "best_title": best["title"],
+        "score": best["score"]
+    }

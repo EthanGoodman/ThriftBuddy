@@ -33,8 +33,6 @@ function ThemeToggle({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) =
 
 export default function AppHeader() {
   const pathname = usePathname();
-  const router = useRouter();
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const isLanding = pathname === "/" || pathname === "/login" || pathname === "/register";
 
@@ -52,7 +50,10 @@ export default function AppHeader() {
     localStorage.setItem("tb_theme", theme);
   }, [theme]);
 
-  const onAuthPages = pathname === "/login" || pathname === "/register";
+  useEffect(() => {
+    if (pathname === "/") setTheme("dark");
+  }, [pathname]);
+
 
   return (
     <header className="sticky top-0 z-30">
@@ -110,8 +111,6 @@ export default function AppHeader() {
             dark:via-white/10
           "
         />
-        {/* remove divider (looks less “sharp”) */}
-        {/* <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" /> */}
       </div>
     </header>
   );

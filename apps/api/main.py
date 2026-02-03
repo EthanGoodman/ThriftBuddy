@@ -19,6 +19,8 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 from dotenv import load_dotenv
 load_dotenv() 
 
+CLIP_URL = os.environ["CLIP_URL"].rstrip("/")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -499,3 +501,284 @@ async def extract_from_files_stream(
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 
 
+async def serp_lens_search(
+        http: httpx.AsyncClient,
+        *,
+        image_url: str,
+        type: str = "all",   # "all" | "products" | "exact_matches" | "visual_matches" | "about_this_image"
+        q: str | None = None # optional refinement
+    ) -> dict:
+        api_key = os.getenv("SERPAPI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="SERPAPI_API_KEY is not set")
+
+        params = {
+            "engine": "google_lens",
+            "url": image_url,        # REQUIRED for Lens
+            "api_key": api_key,
+            "type": type,
+        }
+
+        # Optional text refinement (Lens supports this)
+        if q:
+            params["q"] = q
+
+        r = await http.get(SERPAPI_ENDPOINT, params=params)
+        r.raise_for_status()
+        return r.json()
+
+async def fetch_google_lens_results(*, image_url: str) -> dict:
+    timeout = serp_timeout()
+    async with httpx.AsyncClient(timeout=timeout) as http:
+        return await serp_lens_search(http, image_url=image_url)
+    
+async def gpt_discern_item_from_lens(lens_json: Dict[str, Any]) -> Dict[str, Any]:
+    prompt = LLM_Helper.LENS_ITEM_EXTRACTION_PROMPT.replace(
+        "{{LENS_JSON}}",
+        json.dumps(lens_json, ensure_ascii=False)
+    )
+
+    try:
+        resp = openai_client.responses.create(
+            model="gpt-4.1-mini",
+            input=prompt,
+            temperature=0.0,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "OpenAI request failed", "detail": str(e)},
+        )
+
+    response_text = resp.output_text
+
+    try:
+        item_data = json.loads(response_text)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Invalid JSON returned from GPT Lens extraction",
+                "raw_response": response_text[:500],
+            },
+        )
+
+    return item_data
+
+async def fetch_serp_results_lens(*, query: str, mode: str) -> Tuple[Optional[dict], Optional[dict]]:
+    timeout = serp_timeout()
+    async with httpx.AsyncClient(timeout=timeout) as http:
+        tasks = []
+        if mode in ("active", "both"):
+            tasks.append(serp_search(http, q=query, sold=False))
+        if mode in ("sold", "both"):
+            tasks.append(serp_search(http, q=query, sold=True))
+
+        results = await asyncio.gather(*tasks)
+    if mode in ("active", "both"):
+        return results[0], None
+    if mode in ("sold", "both"):
+        return None, results[0]
+    return results[0], results[1]
+
+@app.post("/api/py/extract-file-stream-lens")
+async def extract_file_stream_lens_simple(
+    main_image: UploadFile = File(...),
+    files: List[UploadFile] = File([]),
+    itemName: Optional[str] = Form(None),
+    text: Optional[str] = Form(None),
+    mode: str = Form("active"),  # "active" | "sold" | "both"
+):
+    t0 = time.time()
+    mode = normalize_mode(mode)
+
+    async def gen():
+        async def emit(step_id: str, label: str, status: str, pct: Optional[float] = None, detail: Optional[str] = None):
+            payload = {"type": "step", "step_id": step_id, "label": label, "status": status}
+            if pct is not None:
+                payload["pct"] = pct
+            if detail:
+                payload["detail"] = detail
+            yield _ndjson(payload)
+
+        try:
+            # --- STEP 1: Read + embed main image (needed for similarity filtering) ---
+            async for chunk in emit("prep", "Reading & embedding input image", "start", 0.02):
+                yield chunk
+
+            main_bytes, extra_bytes = await image_processing.read_images(main_image, files)
+            main_vecs = await image_processing.embed_main_image(main_bytes)
+
+            async for chunk in emit("prep", "Reading & embedding input image", "done", 0.12):
+                yield chunk
+
+            # Decide query source:
+            # If user provides itemName (title), skip Lens + GPT entirely.
+            user_provided_name = (itemName or "").strip()
+
+            lens_json = None
+            lens_item_name = None
+
+            if user_provided_name:
+                # --- STEP 2A: Skip Lens+GPT ---
+                final_item_name = user_provided_name
+                async for chunk in emit("discern", "Determining item name", "done", 0.20, detail="skipped (user provided title)"):
+                    yield chunk
+            else:
+                # --- STEP 2B: Prepare image URL (Cloudflare commented out) ---
+                async for chunk in emit("upload", "Preparing image URL", "start", 0.14):
+                    yield chunk
+
+                # ------------------------------------------------------------
+                # Cloudflare R2 upload (COMMENTED OUT FOR NOW)
+                #
+                # image_url = await r2_storage.upload_bytes_and_get_url(
+                #     bytes_data=main_bytes,
+                #     content_type=main_image.content_type or "image/jpeg",
+                #     filename=main_image.filename or "upload.jpg",
+                #     ttl_seconds=3600,
+                # )
+                # ------------------------------------------------------------
+
+                image_url = "https://i.ebayimg.com/images/g/on4AAeSwFMZpdN1b/s-l1600.webp"
+
+                async for chunk in emit("upload", "Preparing image URL", "done", 0.20, detail="using hardcoded url"):
+                    yield chunk
+
+                # --- STEP 3: SerpAPI Google Lens ---
+                async for chunk in emit("lens", "Querying Google Lens", "start", 0.24):
+                    yield chunk
+
+                lens_json = await fetch_google_lens_results(image_url=image_url)
+
+                visual_matches = lens_json.get("visual_matches", [])[:10]
+
+                candidates = []
+                for vm in visual_matches:
+                    title = vm.get("title")
+                    img = vm.get("image") or vm.get("thumbnail")
+                    if title and img:
+                        candidates.append({
+                            "title": title,
+                            "image": img,
+                        })
+
+                if not candidates:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"error": "No usable visual matches from Google Lens"}
+                    )
+
+
+                async for chunk in emit("lens", "Querying Google Lens", "done", 0.40):
+                    yield chunk
+
+                async for chunk in emit("discern", "Determining item name (image similarity)", "start", 0.44):
+                    yield chunk
+
+                clip_resp = await httpx.AsyncClient(timeout=15.0).post(
+                    f"{CLIP_URL}/best_match",
+                    json={
+                        "query_image": image_url,
+                        "candidates": candidates,
+                    },
+                )
+
+                clip_resp.raise_for_status()
+                best = clip_resp.json()
+
+                final_item_name = best.get("best_title")
+
+                if not final_item_name:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"error": "CLIP could not determine best item title"}
+                    )
+
+                async for chunk in emit(
+                    "discern",
+                    "Determining item name (image similarity)",
+                    "done",
+                    0.52,
+                    detail=final_item_name[:80],
+                ):
+                    yield chunk
+
+
+            # --- STEP 5: Marketplace query (single pass) ---
+            async for chunk in emit("query_mkt", "Querying marketplaces", "start", 0.56):
+                yield chunk
+
+            serp_active, serp_sold = await fetch_serp_results_lens(query=final_item_name, mode=mode)
+            active_items = extract_items(serp_active)
+            sold_items = extract_items(serp_sold)
+
+            async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0.66, detail=f"active={len(active_items)} sold={len(sold_items)}"):
+                yield chunk
+
+            # --- STEP 6: Embed thumbs + filter using your existing threshold logic ---
+            async for chunk in emit("proc_imgs", "Filtering by image similarity", "start", 0.70):
+                yield chunk
+
+            await image_processing.embed_initial_thumbnails_if_needed(
+                active_items=active_items,
+                sold_items=sold_items,
+                mode=mode
+            )
+
+            active_ranked, sold_ranked = rerank_initial_for_signal(
+                active_items=active_items,
+                sold_items=sold_items,
+                main_vecs=main_vecs,
+                mode=mode
+            )
+
+            async for chunk in emit("proc_imgs", "Filtering by image similarity", "done", 0.92):
+                yield chunk
+
+            # Strip heavy fields + build payload
+            if active_ranked and active_ranked.get("filtered_items"):
+                output_builder.strip_heavy_fields(active_items, active_ranked["filtered_items"])
+            else:
+                output_builder.strip_heavy_fields(active_items)
+
+            if sold_ranked and sold_ranked.get("filtered_items"):
+                output_builder.strip_heavy_fields(sold_items, sold_ranked["filtered_items"])
+            else:
+                output_builder.strip_heavy_fields(sold_items)
+
+            frontend = output_builder.build_frontend_payload(
+                mode=mode,
+                initial_query=final_item_name,
+                refined_query=None,  # no refine/requery
+                active_ranked=active_ranked,
+                sold_ranked=sold_ranked,
+            )
+
+            # Debug info (only includes lens fields if used)
+            frontend["lens"] = {
+                "used_lens": (not bool(user_provided_name)),
+                "gpt_item_name": lens_item_name,
+                # "image_url": image_url,  # only exists when lens path is used
+            }
+            if not user_provided_name:
+                frontend["lens"]["image_url"] = image_url
+
+            frontend["timing_sec"] = round(time.time() - t0, 3)
+            yield _ndjson({"type": "result", "data": frontend})
+
+        except HTTPException as e:
+            yield _ndjson({
+                "type": "error",
+                "error": e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)},
+            })
+        except NotImplementedError as e:
+            yield _ndjson({"type": "error", "error": {"error": "Not implemented", "detail": str(e)}})
+        except httpx.TimeoutException as e:
+            yield _ndjson({"type": "error", "error": {"error": "Timeout during external query", "detail": str(e)}})
+        except httpx.HTTPError as e:
+            yield _ndjson({"type": "error", "error": {"error": "HTTP error during external query", "detail": str(e)}})
+        except Exception as e:
+            yield _ndjson({"type": "error", "error": {"error": "Unhandled server error", "detail": str(e)}})
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
