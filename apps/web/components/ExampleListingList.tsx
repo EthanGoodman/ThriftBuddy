@@ -1,7 +1,7 @@
 import {listingKey} from "@/lib/thrift/listing"
 import {fmtMoney} from "@/lib/thrift/format"
 import {ListingRemoveX} from "@/components/ListingRemove"
-import { ExampleListing } from "@/app/(protected)/app/page";
+import { ExampleListing } from "@/app/(protected)/app/types";
 
 export function ExampleListingsList({
   listings,
