@@ -1,4 +1,4 @@
-import { PriceRange } from "@/app/(protected)/app/page";
+import { PriceRange } from "@/app/(protected)/app/types";
 import {fmtMoney} from "@/lib/thrift/format"
 
 export function PriceSummaryCombined({
