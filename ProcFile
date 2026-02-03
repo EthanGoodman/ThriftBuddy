@@ -1,1 +1,0 @@
-web: uvicorn main:app --app-dir apps/api --host 0.0.0.0 --port $PORT --log-level info
