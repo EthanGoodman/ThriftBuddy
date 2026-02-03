@@ -1,4 +1,4 @@
-import { FrontendPayload } from "@/app/(protected)/app/page";
+import { FrontendPayload } from "@/app/(protected)/app/types";
 
 export type StepStatus = "pending" | "active" | "done";
 

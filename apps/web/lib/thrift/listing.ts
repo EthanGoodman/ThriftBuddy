@@ -1,4 +1,4 @@
-import { ExampleListing, PriceRange } from "@/app/(protected)/app/page";
+import { ExampleListing, PriceRange } from "@/app/(protected)/app/types";
 
 export function listingKey(it: ExampleListing, idx: number) {
   // Prefer stable unique fields if present
