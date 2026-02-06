@@ -165,7 +165,8 @@ export function SearchFormCard({
                   <img
                     src={mainPreview.url}
                     alt={mainPreview.name}
-                    className="upload-preview-image"
+                    className="upload-preview-image object-contain"
+                    style={{ objectFit: "contain" }}
                   />
                   <label
                     htmlFor="main-image-upload"

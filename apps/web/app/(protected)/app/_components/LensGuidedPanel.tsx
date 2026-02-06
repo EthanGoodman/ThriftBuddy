@@ -120,7 +120,11 @@ export function LensGuidedPanel({
               <div className="text-xs uppercase tracking-[0.3em] text-muted">Your image</div>
               <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-slate-950/60">
                 {mainPreview ? (
-                  <img src={mainPreview.url} alt={mainPreview.name} className="h-40 w-full object-cover" />
+                  <img
+                    src={mainPreview.url}
+                    alt={mainPreview.name}
+                    className="h-40 w-full object-contain bg-slate-950/60"
+                  />
                 ) : (
                   <div className="flex h-40 items-center justify-center text-xs text-muted">
                     Upload a photo to preview
@@ -197,7 +201,6 @@ export function LensGuidedPanel({
                   <div className="space-y-3">
                     {pageItems.map((item, index) => {
                       const isSelected = selectedId === item.id;
-                      const score = Math.max(70, 96 - (start + index) * 7);
 
                       return (
                         <div
@@ -238,9 +241,6 @@ export function LensGuidedPanel({
                                   {isSelected ? selectedTitle || item.title : item.title}
                                 </div>
                               )}
-                            </div>
-                            <div className="text-xs text-muted">
-                              {item.source ?? "Google Lens"} - {score}% match
                             </div>
                           </div>
                           {isSelected ? (

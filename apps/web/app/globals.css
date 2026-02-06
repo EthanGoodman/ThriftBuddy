@@ -169,15 +169,18 @@ body {
   border-radius: 1.25rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(2, 6, 23, 0.6);
-  min-block-size: clamp(18rem, 34vh, 28rem);
+  block-size: clamp(18rem, 34vh, 28rem);
   max-block-size: min(50dvh, 32rem);
 }
 
+
 .upload-preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    background: rgba(2, 6, 23, 0.6);
+  }
 
 .mode-panel {
   display: flex;
