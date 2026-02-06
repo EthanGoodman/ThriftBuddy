@@ -16,15 +16,13 @@ export function CheckboxChip({
       disabled={disabled}
       className={[
         "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition",
-        "border shadow-sm",
+        "border border-white/10",
         !checked
           ? [
-              "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
-              "dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-800 dark:hover:bg-slate-800/60",
+              "bg-white/5 text-white/80 hover:bg-white/10",
             ].join(" ")
           : [
-              "bg-blue-600/10 text-slate-900 border-blue-500/30 hover:bg-blue-600/15",
-              "dark:bg-blue-600/20 dark:text-slate-100 dark:border-blue-400/40 dark:hover:bg-blue-600/25",
+              "bg-blue-500/20 text-white border-blue-400/40 hover:bg-blue-500/30",
             ].join(" "),
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
         disabled ? "opacity-60 cursor-not-allowed" : "",
@@ -37,7 +35,7 @@ export function CheckboxChip({
           "grid place-items-center h-5 w-5 rounded-md border transition",
           checked
             ? "bg-blue-500 border-blue-400/60"
-            : "bg-transparent border-slate-300 dark:border-white/20",
+            : "bg-transparent border-white/20",
         ].join(" ")}
         aria-hidden="true"
       >

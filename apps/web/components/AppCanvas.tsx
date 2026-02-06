@@ -11,19 +11,37 @@ export default function AppCanvas() {
   return (
     <div className="pointer-events-none fixed inset-0">
       {/* Base */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(30,41,89,0.65),_rgba(6,10,26,1)_50%,_rgba(4,7,18,1)_100%)]" />
+
+      {/* Subtle starfield */}
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(148,163,184,0.18) 1px, transparent 1px)",
+          backgroundSize: "120px 120px",
+        }}
+      />
+      <div
+        className="absolute inset-0 opacity-40"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(99,102,241,0.2) 1px, transparent 1px)",
+          backgroundSize: "260px 260px",
+        }}
+      />
 
       {/* Glow blobs (stronger on landing, weaker in app) */}
       <div
         className={[
-          "absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-blue-600 blur-3xl",
-          isLanding ? "opacity-12" : "opacity-5",
+          "absolute -top-48 -left-48 h-[560px] w-[560px] rounded-full bg-blue-500 blur-[140px]",
+          isLanding ? "opacity-25" : "opacity-12",
         ].join(" ")}
       />
       <div
         className={[
-          "absolute -bottom-40 -right-40 h-[520px] w-[520px] rounded-full bg-emerald-500 blur-3xl",
-          isLanding ? "opacity-10" : "opacity-4",
+          "absolute -bottom-56 -right-52 h-[620px] w-[620px] rounded-full bg-cyan-500 blur-[160px]",
+          isLanding ? "opacity-18" : "opacity-10",
         ].join(" ")}
       />
 
@@ -31,7 +49,7 @@ export default function AppCanvas() {
       <div
         className={[
           "absolute inset-0",
-          "bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0)_0%,rgba(0,0,0,0.35)_70%,rgba(0,0,0,0.62)_100%)]",
+          "bg-[radial-gradient(ellipse_at_center,rgba(8,12,24,0)_0%,rgba(5,8,20,0.4)_70%,rgba(3,5,12,0.75)_100%)]",
           isLanding ? "opacity-100" : "opacity-100",
         ].join(" ")}
       />

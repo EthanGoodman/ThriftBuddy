@@ -1,7 +1,9 @@
+import math
+import re
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from openai import OpenAI
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Counter, Dict, List, Optional, Tuple
 import base64
 import httpx
 import json
@@ -51,6 +53,20 @@ def normalize_mode(mode: str) -> str:
     return mode
 
 
+def validate_image_uploads(main_image: UploadFile, files: List[UploadFile]) -> None:
+    # Only ensure uploads look like images by content type if provided.
+    # Actual decoding/normalization is handled during read.
+    def looks_like_image(ct: str | None) -> bool:
+        return ct is None or ct.startswith("image/")
+
+    if not looks_like_image(main_image.content_type):
+        raise HTTPException(status_code=400, detail="main_image must be an image")
+
+    for f in files:
+        if not looks_like_image(f.content_type):
+            raise HTTPException(status_code=400, detail=f"{f.filename or 'extra'} must be an image")
+
+
 def serp_timeout() -> httpx.Timeout:
     return httpx.Timeout(connect=5.0, read=18.0, write=10.0, pool=5.0)
 
@@ -77,18 +93,18 @@ def extract_items(serp_json: Optional[dict]) -> List[dict]:
 
 def attach_images_to_openai_content(
     content: List[Dict[str, Any]],
-    main_image: UploadFile,
     main_bytes: bytes,
-    extra_files: List[UploadFile],
+    main_content_type: str,
     extra_bytes_list: List[bytes],
+    extra_content_types: List[str],
 ) -> None:
     main_b64 = base64.b64encode(main_bytes).decode("utf-8")
-    main_data_url = f"data:{main_image.content_type};base64,{main_b64}"
+    main_data_url = f"data:{main_content_type};base64,{main_b64}"
     content.append({"type": "input_image", "image_url": main_data_url})
 
-    for f, b in zip(extra_files, extra_bytes_list):
+    for b, ctype in zip(extra_bytes_list, extra_content_types):
         b64 = base64.b64encode(b).decode("utf-8")
-        data_url = f"data:{f.content_type};base64,{b64}"
+        data_url = f"data:{ctype};base64,{b64}"
         content.append({"type": "input_image", "image_url": data_url})
 
 
@@ -100,6 +116,8 @@ async def get_initial_query(
     main_bytes: bytes,
     files: List[UploadFile],
     extra_bytes: List[bytes],
+    main_content_type: str,
+    extra_content_types: List[str],
 ) -> Tuple[str, bool, Optional[dict]]:
     """
     Returns: (query, used_llm, extracted_json_if_any)
@@ -113,7 +131,13 @@ async def get_initial_query(
     if text and text.strip():
         content.append({"type": "input_text", "text": f"User text: {text.strip()}"})
 
-    attach_images_to_openai_content(content, main_image, main_bytes, files, extra_bytes)
+    attach_images_to_openai_content(
+        content,
+        main_bytes,
+        main_content_type,
+        extra_bytes,
+        extra_content_types,
+    )
 
     resp = openai_client.responses.create(
         model="gpt-4o-mini",
@@ -149,6 +173,8 @@ async def maybe_fallback_to_llm_when_text_fails(
     main_bytes: bytes,
     files: List[UploadFile],
     extra_bytes: List[bytes],
+    main_content_type: str,
+    extra_content_types: List[str],
 ) -> Optional[str]:
     """
     If user gave text but we couldn't refine confidently, generate a new query via LLM.
@@ -165,6 +191,8 @@ async def maybe_fallback_to_llm_when_text_fails(
         main_bytes=main_bytes,
         files=files,
         extra_bytes=extra_bytes,
+        main_content_type=main_content_type,
+        extra_content_types=extra_content_types,
     )
     return llm_query
 
@@ -310,6 +338,7 @@ async def extract_from_files_stream(
 ):
     t0 = time.time()
     mode = normalize_mode(mode)
+    validate_image_uploads(main_image, files)
 
     async def gen():
         async def emit(step_id: str, label: str, status: str, pct: Optional[float] = None, detail: Optional[str] = None):
@@ -332,7 +361,9 @@ async def extract_from_files_stream(
             print("1")
 
             # read + embed main are part of query generation "prep"
-            main_bytes, extra_bytes = await image_processing.read_images(main_image, files)
+            main_bytes, extra_bytes, main_content_type, extra_content_types = await image_processing.read_images(
+                main_image, files
+            )
             main_vecs = await image_processing.embed_main_image(main_bytes)
 
             query, used_llm, _extracted = await get_initial_query(
@@ -342,85 +373,70 @@ async def extract_from_files_stream(
                 main_bytes=main_bytes,
                 files=files,
                 extra_bytes=extra_bytes,
+                main_content_type=main_content_type,
+                extra_content_types=extra_content_types,
             )
             print("2")
 
-            async for chunk in emit("gen_query", "Generating marketplace query", "done", 0.18, detail=("used LLM" if used_llm else "used input")):
+            async for chunk in emit("gen_query", "Generating marketplace query", "done", 0.18):
                 yield chunk
 
-            # --- STEP 2: Querying marketplaces (initial) ---
-            async for chunk in emit("query_mkt", "Querying marketplaces", "start", 0.20):
-                yield chunk
+            direct_final = bool(itemName and itemName.strip())
 
-            serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
-            active_items = extract_items(serp_active)
-            sold_items = extract_items(serp_sold)
-            print("3")
+            if direct_final:
+                # When itemName is provided, skip initial SERP, initial embedding/rerank, refinement, and fallback.
+                active_items = []
+                sold_items = []
+                active_ranked = None
+                sold_ranked = None
+                refined_query = query
 
-            async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0., detail=f"active={len(active_items)} sold={len(sold_items)}"):
-                yield chunk
-
-            # --- STEP 3: Processing item images (embed thumbs + rerank) ---
-            async for chunk in emit("proc_imgs", "Processing item images", "start", 0.32):
-                yield chunk
-
-            await image_processing.embed_initial_thumbnails_if_needed(
-                active_items=active_items,
-                sold_items=sold_items,
-                mode=mode
-            )
-
-            print("4")
-
-            active_ranked, sold_ranked = rerank_initial_for_signal(
-                active_items=active_items,
-                sold_items=sold_items,
-                main_vecs=main_vecs,
-                mode=mode
-            )
-
-            print("5")
-
-            async for chunk in emit("proc_imgs", "Processing item images", "done", 0.65):
-                yield chunk
-
-            # --- STEP 4: Refining search query ---
-            async for chunk in emit("refine", "Refining search query", "start", 0.67):
-                yield chunk
-
-            refined_query = await query_refining.refine_query_if_confident(
-                original_query=query,
-                active_items=active_items,
-                sold_items=sold_items,
-                main_vecs=main_vecs,
-            )
-
-            print("6")
-
-            # optional fallback (still within refine step)
-            fallback_llm_query = await maybe_fallback_to_llm_when_text_fails(
-                original_text=text,
-                refined_query=refined_query,
-                main_image=main_image,
-                main_bytes=main_bytes,
-                files=files,
-                extra_bytes=extra_bytes,
-            )
-
-            print("6")
-
-            if fallback_llm_query:
-                query = fallback_llm_query
-                used_llm = True
+                async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0.20, detail="skipped (Item Name provided)"):
+                    yield chunk
+                async for chunk in emit("proc_imgs", "Processing item images", "done", 0.65, detail="skipped (Item Name provided)"):
+                    yield chunk
+                async for chunk in emit("refine", "Refining search query", "done", 0.80, detail="skipped (Item Name provided)"):
+                    yield chunk
+            else:
+                # --- STEP 2: Querying marketplaces (initial) ---
+                async for chunk in emit("query_mkt", "Querying marketplaces", "start", 0.20):
+                    yield chunk
 
                 serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
                 active_items = extract_items(serp_active)
                 sold_items = extract_items(serp_sold)
+                print("3")
 
-                await image_processing.embed_initial_thumbnails_if_needed(active_items=active_items, sold_items=sold_items, mode=mode)
-                active_ranked, sold_ranked = rerank_initial_for_signal(
-                    active_items=active_items, sold_items=sold_items, main_vecs=main_vecs, mode=mode
+                async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0.):
+                    yield chunk
+
+                # --- STEP 3: Processing item images (embed thumbs + rerank) ---
+                async for chunk in emit("proc_imgs", "Processing item images", "start", 0.32):
+                    yield chunk
+
+                await image_processing.embed_initial_thumbnails_if_needed(
+                    active_items=active_items,
+                    sold_items=sold_items,
+                    mode=mode
                 )
+
+                print("4")
+
+                active_ranked, sold_ranked = rerank_initial_for_signal(
+                    active_items=active_items,
+                    sold_items=sold_items,
+                    main_vecs=main_vecs,
+                    mode=mode
+                )
+
+                print("5")
+
+                async for chunk in emit("proc_imgs", "Processing item images", "done", 0.65):
+                    yield chunk
+
+                # --- STEP 4: Refining search query ---
+                async for chunk in emit("refine", "Refining search query", "start", 0.67):
+                    yield chunk
 
                 refined_query = await query_refining.refine_query_if_confident(
                     original_query=query,
@@ -428,14 +444,53 @@ async def extract_from_files_stream(
                     sold_items=sold_items,
                     main_vecs=main_vecs,
                 )
-            print("7")
 
-            async for chunk in emit("refine", "Refining search query", "done", 0.80, detail=(refined_query or "no refinement")):
-                yield chunk
+                print("6")
 
+                # optional fallback (still within refine step)
+                fallback_llm_query = await maybe_fallback_to_llm_when_text_fails(
+                    original_text=text,
+                    refined_query=refined_query,
+                    main_image=main_image,
+                    main_bytes=main_bytes,
+                    files=files,
+                    extra_bytes=extra_bytes,
+                    main_content_type=main_content_type,
+                    extra_content_types=extra_content_types,
+                )
+
+                print("6")
+
+                if fallback_llm_query:
+                    query = fallback_llm_query
+                    used_llm = True
+
+                    serp_active, serp_sold = await fetch_initial_serp_results(query=query, mode=mode)
+                    active_items = extract_items(serp_active)
+                    sold_items = extract_items(serp_sold)
+
+                    await image_processing.embed_initial_thumbnails_if_needed(active_items=active_items, sold_items=sold_items, mode=mode)
+                    active_ranked, sold_ranked = rerank_initial_for_signal(
+                        active_items=active_items, sold_items=sold_items, main_vecs=main_vecs, mode=mode
+                    )
+
+                    refined_query = await query_refining.refine_query_if_confident(
+                        original_query=query,
+                        active_items=active_items,
+                        sold_items=sold_items,
+                        main_vecs=main_vecs,
+                    )
+                print("7")
+
+                async for chunk in emit("refine", "Refining search query", "done", 0.80):
+                    yield chunk
+
+            finalStepMessage = "Re-querying marketplaces"
+            if direct_final:
+                finalStepMessage = "Querying marketplaces"
             # --- STEP 5: Re-querying marketplaces (only if refined_query exists) ---
             if refined_query:
-                async for chunk in emit("requery", "Re-querying marketplaces", "start", 0.82):
+                async for chunk in emit("requery", finalStepMessage, "start", 0.82):
                     yield chunk
 
             final_candidates = await fetch_final_candidates(
@@ -502,12 +557,12 @@ async def extract_from_files_stream(
 
 
 async def serp_lens_search(
-        http: httpx.AsyncClient,
-        *,
-        image_url: str,
-        type: str = "all",   # "all" | "products" | "exact_matches" | "visual_matches" | "about_this_image"
-        q: str | None = None # optional refinement
-    ) -> dict:
+    http: httpx.AsyncClient,
+    *,
+    image_url: str,
+    type: str = "all",   # "all" | "products" | "exact_matches" | "visual_matches" | "about_this_image"
+    q: str | None = None # optional refinement
+) -> dict:
         api_key = os.getenv("SERPAPI_API_KEY")
         if not api_key:
             raise HTTPException(status_code=500, detail="SERPAPI_API_KEY is not set")
@@ -527,10 +582,10 @@ async def serp_lens_search(
         r.raise_for_status()
         return r.json()
 
-async def fetch_google_lens_results(*, image_url: str) -> dict:
+async def fetch_google_lens_results(*, image_url: str, q: Optional[str] = None) -> dict:
     timeout = serp_timeout()
     async with httpx.AsyncClient(timeout=timeout) as http:
-        return await serp_lens_search(http, image_url=image_url)
+        return await serp_lens_search(http, image_url=image_url, q=q)
     
 async def gpt_discern_item_from_lens(lens_json: Dict[str, Any]) -> Dict[str, Any]:
     prompt = LLM_Helper.LENS_ITEM_EXTRACTION_PROMPT.replace(
@@ -565,220 +620,118 @@ async def gpt_discern_item_from_lens(lens_json: Dict[str, Any]) -> Dict[str, Any
 
     return item_data
 
-async def fetch_serp_results_lens(*, query: str, mode: str) -> Tuple[Optional[dict], Optional[dict]]:
+async def fetch_serp_results_lens(*, query: str, mode: str):
     timeout = serp_timeout()
     async with httpx.AsyncClient(timeout=timeout) as http:
         tasks = []
         if mode in ("active", "both"):
-            tasks.append(serp_search(http, q=query, sold=False))
+            tasks.append(("active", serp_search(http, q=query, sold=False)))
         if mode in ("sold", "both"):
-            tasks.append(serp_search(http, q=query, sold=True))
+            tasks.append(("sold", serp_search(http, q=query, sold=True)))
 
-        results = await asyncio.gather(*tasks)
-    if mode in ("active", "both"):
-        return results[0], None
-    if mode in ("sold", "both"):
-        return None, results[0]
-    return results[0], results[1]
+        out = {"active": None, "sold": None}
+        results = await asyncio.gather(*(t[1] for t in tasks))
+        for (kind, _), res in zip(tasks, results):
+            out[kind] = res
+
+    return out["active"], out["sold"]
+
+def build_lens_anchor_prompt(*, lens_prompt_template: str, trimmed_lens_json: dict, anchor_title: str) -> str:
+    anchor_block = f"""
+IMPORTANT CONTEXT:
+- The following title is the BEST visual match selected via CLIP similarity (highest cosine similarity).
+- Treat it as the primary anchor, but still verify/support using other Lens results.
+ANCHOR_TITLE:
+{anchor_title}
+""".strip()
+
+    base = lens_prompt_template.replace(
+        "{{LENS_JSON}}",
+        json.dumps(trimmed_lens_json, ensure_ascii=False)
+    )
+    return anchor_block + "\n\n" + base
+
+
+def build_lens_candidates(lens_json: Dict[str, Any], *, limit: int = 20) -> List[Dict[str, Any]]:
+    candidates: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_items(items: List[dict], source: str):
+        nonlocal candidates
+        for item in items or []:
+            title = (item.get("title") or item.get("name") or "").strip()
+            image = output_builder.normalize_marketplace_image_url(item.get("image") or item.get("thumbnail"))
+            link = item.get("link")
+            if not title or not image:
+                continue
+            key = f"{title}|{image}"
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(
+                {
+                    "id": f"lens_{len(candidates)}",
+                    "title": title,
+                    "image": image,
+                    "link": link,
+                    "source": source,
+                }
+            )
+            if len(candidates) >= limit:
+                break
+
+    add_items(lens_json.get("visual_matches") or [], "visual_matches")
+    if len(candidates) < limit:
+        add_items(lens_json.get("products") or [], "products")
+    if len(candidates) < limit:
+        add_items(lens_json.get("exact_matches") or [], "exact_matches")
+
+    return candidates[:limit]
+
 
 @app.post("/extract-file-stream-lens")
-async def extract_file_stream_lens_simple(
+async def extract_file_stream_lens_guided(
     main_image: UploadFile = File(...),
     files: List[UploadFile] = File([]),
-    itemName: Optional[str] = Form(None),
     text: Optional[str] = Form(None),
-    mode: str = Form("active"),  # "active" | "sold" | "both"
 ):
-    t0 = time.time()
-    mode = normalize_mode(mode)
+    try:
+        # NOTE: We still accept files to avoid breaking the client,
+        # but Lens only needs a hosted image URL for now.
+        # ------------------------------------------------------------
+        # Cloudflare R2 upload (COMMENTED OUT FOR NOW)
+        #
+        # main_bytes, _extra_bytes = await image_processing.read_images(main_image, files)
+        # image_url = await r2_storage.upload_bytes_and_get_url(
+        #     bytes_data=main_bytes,
+        #     content_type=main_image.content_type or "image/jpeg",
+        #     filename=main_image.filename or "upload.jpg",
+        #     ttl_seconds=3600,
+        # )
+        # ------------------------------------------------------------
 
-    async def gen():
-        async def emit(step_id: str, label: str, status: str, pct: Optional[float] = None, detail: Optional[str] = None):
-            payload = {"type": "step", "step_id": step_id, "label": label, "status": status}
-            if pct is not None:
-                payload["pct"] = pct
-            if detail:
-                payload["detail"] = detail
-            yield _ndjson(payload)
+        image_url = "https://i.ebayimg.com/images/g/BuwAAeSweFVorj1v/s-l500.jpg"
 
-        try:
-            # --- STEP 1: Read + embed main image (needed for similarity filtering) ---
-            async for chunk in emit("prep", "Reading & embedding input image", "start", 0.02):
-                yield chunk
+        lens_query = text.strip() if text and text.strip() else None
+        lens_json_full = await fetch_google_lens_results(image_url=image_url, q=lens_query)
+        candidates = build_lens_candidates(lens_json_full, limit=20)
+        if not candidates:
+            raise HTTPException(status_code=400, detail={"error": "No usable Google Lens matches"})
 
-            main_bytes, extra_bytes = await image_processing.read_images(main_image, files)
-            main_vecs = await image_processing.embed_main_image(main_bytes)
-
-            async for chunk in emit("prep", "Reading & embedding input image", "done", 0.12):
-                yield chunk
-
-            # Decide query source:
-            # If user provides itemName (title), skip Lens + GPT entirely.
-            user_provided_name = (itemName or "").strip()
-
-            lens_json = None
-            lens_item_name = None
-
-            if user_provided_name:
-                # --- STEP 2A: Skip Lens+GPT ---
-                final_item_name = user_provided_name
-                async for chunk in emit("discern", "Determining item name", "done", 0.20, detail="skipped (user provided title)"):
-                    yield chunk
-            else:
-                # --- STEP 2B: Prepare image URL (Cloudflare commented out) ---
-                async for chunk in emit("upload", "Preparing image URL", "start", 0.14):
-                    yield chunk
-
-                # ------------------------------------------------------------
-                # Cloudflare R2 upload (COMMENTED OUT FOR NOW)
-                #
-                # image_url = await r2_storage.upload_bytes_and_get_url(
-                #     bytes_data=main_bytes,
-                #     content_type=main_image.content_type or "image/jpeg",
-                #     filename=main_image.filename or "upload.jpg",
-                #     ttl_seconds=3600,
-                # )
-                # ------------------------------------------------------------
-
-                image_url = "https://i.ebayimg.com/images/g/on4AAeSwFMZpdN1b/s-l1600.webp"
-
-                async for chunk in emit("upload", "Preparing image URL", "done", 0.20, detail="using hardcoded url"):
-                    yield chunk
-
-                # --- STEP 3: SerpAPI Google Lens ---
-                async for chunk in emit("lens", "Querying Google Lens", "start", 0.24):
-                    yield chunk
-
-                lens_json = await fetch_google_lens_results(image_url=image_url)
-
-                visual_matches = lens_json.get("visual_matches", [])[:10]
-
-                candidates = []
-                for vm in visual_matches:
-                    title = vm.get("title")
-                    img = vm.get("image") or vm.get("thumbnail")
-                    if title and img:
-                        candidates.append({
-                            "title": title,
-                            "image": img,
-                        })
-
-                if not candidates:
-                    raise HTTPException(
-                        status_code=400,
-                        detail={"error": "No usable visual matches from Google Lens"}
-                    )
-
-
-                async for chunk in emit("lens", "Querying Google Lens", "done", 0.40):
-                    yield chunk
-
-                async for chunk in emit("discern", "Determining item name (image similarity)", "start", 0.44):
-                    yield chunk
-
-                clip_resp = await httpx.AsyncClient(timeout=15.0).post(
-                    f"{CLIP_URL}/best_match",
-                    json={
-                        "query_image": image_url,
-                        "candidates": candidates,
-                    },
-                )
-
-                clip_resp.raise_for_status()
-                best = clip_resp.json()
-
-                final_item_name = best.get("best_title")
-
-                if not final_item_name:
-                    raise HTTPException(
-                        status_code=400,
-                        detail={"error": "CLIP could not determine best item title"}
-                    )
-
-                async for chunk in emit(
-                    "discern",
-                    "Determining item name (image similarity)",
-                    "done",
-                    0.52,
-                    detail=final_item_name[:80],
-                ):
-                    yield chunk
-
-
-            # --- STEP 5: Marketplace query (single pass) ---
-            async for chunk in emit("query_mkt", "Querying marketplaces", "start", 0.56):
-                yield chunk
-
-            serp_active, serp_sold = await fetch_serp_results_lens(query=final_item_name, mode=mode)
-            active_items = extract_items(serp_active)
-            sold_items = extract_items(serp_sold)
-
-            async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0.66, detail=f"active={len(active_items)} sold={len(sold_items)}"):
-                yield chunk
-
-            # --- STEP 6: Embed thumbs + filter using your existing threshold logic ---
-            async for chunk in emit("proc_imgs", "Filtering by image similarity", "start", 0.70):
-                yield chunk
-
-            await image_processing.embed_initial_thumbnails_if_needed(
-                active_items=active_items,
-                sold_items=sold_items,
-                mode=mode
-            )
-
-            active_ranked, sold_ranked = rerank_initial_for_signal(
-                active_items=active_items,
-                sold_items=sold_items,
-                main_vecs=main_vecs,
-                mode=mode
-            )
-
-            async for chunk in emit("proc_imgs", "Filtering by image similarity", "done", 0.92):
-                yield chunk
-
-            # Strip heavy fields + build payload
-            if active_ranked and active_ranked.get("filtered_items"):
-                output_builder.strip_heavy_fields(active_items, active_ranked["filtered_items"])
-            else:
-                output_builder.strip_heavy_fields(active_items)
-
-            if sold_ranked and sold_ranked.get("filtered_items"):
-                output_builder.strip_heavy_fields(sold_items, sold_ranked["filtered_items"])
-            else:
-                output_builder.strip_heavy_fields(sold_items)
-
-            frontend = output_builder.build_frontend_payload(
-                mode=mode,
-                initial_query=final_item_name,
-                refined_query=None,  # no refine/requery
-                active_ranked=active_ranked,
-                sold_ranked=sold_ranked,
-            )
-
-            # Debug info (only includes lens fields if used)
-            frontend["lens"] = {
-                "used_lens": (not bool(user_provided_name)),
-                "gpt_item_name": lens_item_name,
-                # "image_url": image_url,  # only exists when lens path is used
+        return JSONResponse(
+            {
+                "image_url": image_url,
+                "total": len(candidates),
+                "candidates": candidates,
             }
-            if not user_provided_name:
-                frontend["lens"]["image_url"] = image_url
+        )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException as e:
+        raise HTTPException(status_code=504, detail={"error": "Timeout during Google Lens query", "detail": str(e)})
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail={"error": "HTTP error during Google Lens query", "detail": str(e)})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": "Unhandled server error", "detail": str(e)})
 
-            frontend["timing_sec"] = round(time.time() - t0, 3)
-            yield _ndjson({"type": "result", "data": frontend})
 
-        except HTTPException as e:
-            yield _ndjson({
-                "type": "error",
-                "error": e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)},
-            })
-        except NotImplementedError as e:
-            yield _ndjson({"type": "error", "error": {"error": "Not implemented", "detail": str(e)}})
-        except httpx.TimeoutException as e:
-            yield _ndjson({"type": "error", "error": {"error": "Timeout during external query", "detail": str(e)}})
-        except httpx.HTTPError as e:
-            yield _ndjson({"type": "error", "error": {"error": "HTTP error during external query", "detail": str(e)}})
-        except Exception as e:
-            yield _ndjson({"type": "error", "error": {"error": "Unhandled server error", "detail": str(e)}})
-
-    return StreamingResponse(gen(), media_type="application/x-ndjson")

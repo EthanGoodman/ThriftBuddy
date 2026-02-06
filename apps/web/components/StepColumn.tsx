@@ -11,7 +11,7 @@ export function StepColumn({
 }) {
   return (
     <div className="w-full">
-      <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+      <div className="text-xs font-semibold text-muted mb-2">
         Current step
       </div>
 
@@ -26,8 +26,8 @@ export function StepColumn({
                   className={[
                     "grid place-items-center h-5 w-5 rounded-full border text-xs shrink-0",
                     isActive
-                      ? "border-blue-400/70 text-blue-500 animate-pulse"
-                      : "border-emerald-400/70 bg-emerald-500/10 text-emerald-500",
+                      ? "border-blue-400/70 text-blue-300 animate-pulse"
+                      : "border-emerald-400/70 bg-emerald-500/10 text-emerald-300",
                   ].join(" ")}
                   aria-hidden="true"
                 >
@@ -56,9 +56,7 @@ export function StepColumn({
                 <span
                   className={[
                     "text-xs",
-                    isActive
-                      ? "text-slate-500 dark:text-slate-400 animate-pulse"
-                      : "text-slate-800 dark:text-slate-200",
+                    isActive ? "text-muted animate-pulse" : "text-white",
                   ].join(" ")}
                 >
                   {s.label}

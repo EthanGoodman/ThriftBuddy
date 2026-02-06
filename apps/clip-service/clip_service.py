@@ -2,7 +2,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from typing import List
 from io import BytesIO
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import torch
 import open_clip
 import asyncio
@@ -129,23 +129,44 @@ async def best_match(req: BestMatchRequest):
         # ---- embed query image ----
         q_img = await http.get(str(req.query_image))
         q_img.raise_for_status()
-        q_vecs = image_bytes_to_embeddings_multicrop(q_img.content, MAIN_CROPS)
+
+        try:
+            q_vecs = image_bytes_to_embeddings_multicrop(q_img.content, MAIN_CROPS)
+        except (UnidentifiedImageError, OSError, ValueError):
+            raise HTTPException(status_code=400, detail="Query image could not be decoded")
+
         q = _avg_vec(q_vecs)
 
         best = {"title": None, "score": -1.0}
+        usable = 0
+        skipped = 0
 
         # ---- embed candidates ----
         for c in req.candidates:
-            r = await http.get(str(c.image))
-            r.raise_for_status()
-            vecs = image_bytes_to_embeddings_multicrop(r.content, MAIN_CROPS)
+            try:
+                r = await http.get(str(c.image))
+                r.raise_for_status()
+            except Exception:
+                skipped += 1
+                continue
+
+            try:
+                vecs = image_bytes_to_embeddings_multicrop(r.content, MAIN_CROPS)
+            except (UnidentifiedImageError, OSError, ValueError):
+                skipped += 1
+                continue
+
             v = _avg_vec(vecs)
             score = _dot(q, v)
+            usable += 1
 
             if score > best["score"]:
                 best = {"title": c.title, "score": score}
 
-    return {
-        "best_title": best["title"],
-        "score": best["score"]
-    }
+    if usable == 0:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "No decodable candidate images", "skipped": skipped},
+        )
+
+    return {"best_title": best["title"], "score": best["score"], "usable_candidates": usable, "skipped": skipped}

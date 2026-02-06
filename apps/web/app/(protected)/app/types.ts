@@ -23,6 +23,7 @@ export type ExampleListing = {
   title?: string;
   link?: string;
   thumbnail?: string;
+  image?: string;
   condition?: string;
   location?: string;
   image_similarity?: number;
@@ -45,4 +46,18 @@ export type FrontendPayload = {
   sold_listings: ExampleListing[];
   summary: string;
   timing_sec?: number;
+};
+
+export type LensCandidate = {
+  id: string;
+  title: string;
+  image: string;
+  link?: string;
+  source?: string;
+};
+
+export type LensCandidatesResponse = {
+  image_url: string;
+  total: number;
+  candidates: LensCandidate[];
 };

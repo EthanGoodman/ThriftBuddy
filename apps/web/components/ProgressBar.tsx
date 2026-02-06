@@ -10,18 +10,18 @@ export function ProgressBar({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <div className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="text-xs text-muted">
           Overall progress
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+        <div className="text-xs text-muted tabular-nums">
           {pct}%
         </div>
       </div>
 
-      <div className="relative h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+      <div className="relative h-3 w-full overflow-hidden rounded-full bg-white/10">
         {/* filled portion */}
         <div
-          className="h-full rounded-full bg-blue-600 dark:bg-blue-500 transition-[width] duration-300 ease-out"
+          className="h-full rounded-full bg-blue-500 transition-[width] duration-300 ease-out"
           style={{ width: `${pct}%` }}
         />
 

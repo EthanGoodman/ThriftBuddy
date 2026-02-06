@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 type Theme = "dark" | "light";
 
@@ -19,14 +19,15 @@ function ThemeToggle({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) =
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
       ].join(" ")}
     >
-      <span className="absolute left-2 text-xs select-none">🌙</span>
-      <span className="absolute right-2 text-xs select-none">☀️</span>
-      <span className={[
-        "absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full shadow transition-transform",
-        "bg-slate-900 dark:bg-white",
-        theme === "dark" ? "translate-x-[4px]" : "translate-x-[36px]",
-      ].join(" ")} />
-
+      <span className="absolute left-2 text-xs select-none">moon</span>
+      <span className="absolute right-2 text-xs select-none">sun</span>
+      <span
+        className={[
+          "absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full shadow transition-transform",
+          "bg-slate-900 dark:bg-white",
+          theme === "dark" ? "translate-x-[4px]" : "translate-x-[36px]",
+        ].join(" ")}
+      />
     </button>
   );
 }
@@ -35,6 +36,7 @@ export default function AppHeader() {
   const pathname = usePathname();
 
   const isLanding = pathname === "/" || pathname === "/login" || pathname === "/register";
+  const hideHeader = pathname?.startsWith("/app");
 
   const [theme, setTheme] = useState<Theme>("dark");
 
@@ -54,28 +56,30 @@ export default function AppHeader() {
     if (pathname === "/") setTheme("dark");
   }, [pathname]);
 
+  if (hideHeader) return null;
 
   return (
     <header className="sticky top-0 z-30">
       <div className="relative">
-        {/* ambient glow */}
         <div
           className="pointer-events-none absolute inset-x-0 -top-24 h-48
           bg-[radial-gradient(60%_40%_at_20%_0%,rgba(59,130,246,0.18),transparent)]"
         />
 
-        {/* glass surface */}
         <div
           className={[
             "backdrop-blur-md transition-colors",
             isLanding
-              ? (theme === "dark" ? "bg-transparent" : "bg-white/70")
-              : (theme === "dark" ? "bg-slate-950/70" : "bg-slate-100"),
+              ? theme === "dark"
+                ? "bg-transparent"
+                : "bg-white/70"
+              : theme === "dark"
+                ? "bg-slate-950/70"
+                : "bg-slate-100",
           ].join(" ")}
         >
           <div className="mx-auto w-full max-w-7xl px-8">
             <div className="flex items-center justify-between py-5">
-              {/* Left: brand */}
               <Link
                 href="/"
                 className="group -ml-2 inline-flex items-center gap-2 rounded-2xl px-3 py-2 transition hover:bg-white/[0.04]"
@@ -87,30 +91,17 @@ export default function AppHeader() {
                   beta
                 </span>
               </Link>
-              
 
-              {/* Right: actions */}
               <div className="flex items-center gap-3">
                 <div className="hidden md:block text-xs text-slate-500/80 dark:text-slate-400/70">
-                  minimal · calm · built for resale research
+                  minimal - calm - built for resale research
                 </div>
-                {!isLanding && (
-                  <ThemeToggle theme={theme} setTheme={setTheme} />
-                )}
+                {!isLanding && <ThemeToggle theme={theme} setTheme={setTheme} />}
               </div>
             </div>
           </div>
         </div>
-        <div
-          className="
-            h-px
-            bg-gradient-to-r
-            from-transparent
-            via-black/10
-            to-transparent
-            dark:via-white/10
-          "
-        />
+        <div className="h-px bg-gradient-to-r from-transparent via-black/10 to-transparent dark:via-white/10" />
       </div>
     </header>
   );

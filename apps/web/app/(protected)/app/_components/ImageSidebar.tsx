@@ -5,6 +5,7 @@ import { Thumb } from "./Thumb";
 type ImageSidebarProps = {
   mainPreview?: Preview;
   extraPreviews: PreviewWithSlot[];
+  showExtras?: boolean;
   onOpen: (url: string, name: string) => void;
   onRemoveMain: () => void;
   onRemoveExtra: (slotIndex: number) => void;
@@ -13,6 +14,7 @@ type ImageSidebarProps = {
 export function ImageSidebar({
   mainPreview,
   extraPreviews,
+  showExtras = true,
   onOpen,
   onRemoveMain,
   onRemoveExtra,
@@ -40,27 +42,29 @@ export function ImageSidebar({
             )}
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Extra Images</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">{extraPreviews.length}</div>
-            </div>
-
-            {extraPreviews.length ? (
-              <div className="grid grid-cols-3 lg:grid-cols-2 gap-2">
-                {extraPreviews.map((p) => (
-                  <Thumb
-                    key={p.key}
-                    p={p}
-                    onOpen={() => onOpen(p.url, p.name)}
-                    onRemove={() => onRemoveExtra(p.slotIndex)}
-                  />
-                ))}
+          {showExtras && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Extra Images</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">{extraPreviews.length}</div>
               </div>
-            ) : (
-              <div className="text-xs text-slate-500 dark:text-slate-400">No extra images selected.</div>
-            )}
-          </div>
+
+              {extraPreviews.length ? (
+                <div className="grid grid-cols-3 lg:grid-cols-2 gap-2">
+                  {extraPreviews.map((p) => (
+                    <Thumb
+                      key={p.key}
+                      p={p}
+                      onOpen={() => onOpen(p.url, p.name)}
+                      onRemove={() => onRemoveExtra(p.slotIndex)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500 dark:text-slate-400">No extra images selected.</div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

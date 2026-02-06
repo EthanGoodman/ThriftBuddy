@@ -18,14 +18,12 @@ export function ListingRemoveX({
         "inline-flex items-center justify-center",
         "h-6 w-6 rounded-md", // click target
         "bg-transparent",
-        // icon color
-        "text-slate-400 hover:text-slate-900 dark:text-slate-500 dark:hover:text-slate-100",
-        // optional subtle hover hitbox (remove if you want fully invisible)
-        "hover:bg-slate-900/5 dark:hover:bg-white/10",
+        "text-white/40 hover:text-white",
+        "hover:bg-white/10",
         "active:scale-95 transition",
         // important: only show ring for keyboard focus
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
-        "focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900",
+        "focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
       ].join(" ")}
     >
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">

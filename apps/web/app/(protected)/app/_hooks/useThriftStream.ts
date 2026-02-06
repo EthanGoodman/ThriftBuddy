@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { computePriceRangeFromListings, getVisiblePricedListings } from "@/lib/thrift/listing";
 import {
@@ -11,6 +11,11 @@ import {
 } from "@/lib/thrift/stream";
 
 import type { FrontendPayload, Mode } from "../types";
+
+type StepMeta = {
+  label: string;
+  detail?: string;
+};
 
 type UseThriftStreamParams = {
   mainImage: File | null;
@@ -117,6 +122,8 @@ export function useThriftStream({
 
   const [activeSteps, setActiveSteps] = useState<Record<string, StepStatus>>(makeInitialStepState());
   const [soldSteps, setSoldSteps] = useState<Record<string, StepStatus>>(makeInitialStepState());
+  const [activeStepMeta, setActiveStepMeta] = useState<Record<string, StepMeta>>({});
+  const [soldStepMeta, setSoldStepMeta] = useState<Record<string, StepMeta>>({});
 
   const activeAbortRef = useRef<AbortController | null>(null);
   const soldAbortRef = useRef<AbortController | null>(null);
@@ -170,6 +177,7 @@ export function useThriftStream({
       setActiveProgress(0);
       setActiveLoading(true);
       setActiveSteps(makeInitialStepState());
+      setActiveStepMeta({});
     } else {
       setDismissedSold(new Set());
       setSoldError("");
@@ -177,6 +185,7 @@ export function useThriftStream({
       setSoldProgress(0);
       setSoldLoading(true);
       setSoldSteps(makeInitialStepState());
+      setSoldStepMeta({});
     }
   }
 
@@ -185,6 +194,15 @@ export function useThriftStream({
     if (mode === "active") setActiveLoading(false);
     else setSoldLoading(false);
   }
+
+  const clearErrors = useCallback((mode: Mode | "both" = "both") => {
+    if (mode === "active") setActiveError("");
+    else if (mode === "sold") setSoldError("");
+    else {
+      setActiveError("");
+      setSoldError("");
+    }
+  }, []);
 
   function abortAll() {
     activeAbortRef.current?.abort();
@@ -287,6 +305,15 @@ export function useThriftStream({
         }
       };
 
+      const setStepMeta = (stepId: string, meta: StepMeta) => {
+        if (mode === "active") setActiveStepMeta((prev) => ({ ...prev, [stepId]: meta }));
+        else if (mode === "sold") setSoldStepMeta((prev) => ({ ...prev, [stepId]: meta }));
+        else {
+          setActiveStepMeta((prev) => ({ ...prev, [stepId]: meta }));
+          setSoldStepMeta((prev) => ({ ...prev, [stepId]: meta }));
+        }
+      };
+
       const normalizeActives = (currentStepId: string) => {
         const normalize = (setter: any) => {
           setter((prev: any) => {
@@ -319,6 +346,8 @@ export function useThriftStream({
 
         if (msg.type === "step") {
           if (msg.pct != null) setProgress(msg.pct);
+
+          setStepMeta(msg.step_id, { label: msg.label, detail: msg.detail });
 
           if (msg.status === "start") {
             normalizeActives(msg.step_id);
@@ -405,6 +434,8 @@ export function useThriftStream({
     activeSteps,
     soldSteps,
     combinedSteps,
+    activeStepMeta,
+    soldStepMeta,
     activeError,
     soldError,
     dismissedActive,
@@ -414,6 +445,7 @@ export function useThriftStream({
     runMode,
     resetModeForNewRun,
     clearModeCompletely,
+    clearErrors,
     abortAll,
   };
 }

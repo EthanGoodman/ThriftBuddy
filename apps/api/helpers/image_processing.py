@@ -1,10 +1,13 @@
 from typing import Any, Dict, List, Optional, Tuple
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
+from io import BytesIO
+from PIL import Image, UnidentifiedImageError
 import httpx
 import asyncio
 import os
 
 CLIP_URL = os.environ["CLIP_URL"].rstrip("/")
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # ---- Thumbnail embedding cache (in-memory) ----
 # Key: product_id (str) OR thumbnail URL as fallback
@@ -30,15 +33,57 @@ async def embed_initial_thumbnails_if_needed(
             sold_items, max_items=EMBED_MAX_INITIAL, concurrency=THUMB_CONCURRENCY
         )
 
+def _convert_to_jpeg(img_bytes: bytes) -> bytes:
+    try:
+        with Image.open(BytesIO(img_bytes)) as im:
+            im.load()
+            if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+                base = Image.new("RGBA", im.size, (255, 255, 255, 255))
+                base.paste(im.convert("RGBA"), mask=im.convert("RGBA").split()[-1])
+                im = base.convert("RGB")
+            else:
+                im = im.convert("RGB")
+            out = BytesIO()
+            im.save(out, format="JPEG", quality=92, optimize=True)
+            return out.getvalue()
+    except (UnidentifiedImageError, OSError):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Invalid image file", "detail": "Could not read the uploaded image."},
+        )
+
+
+def _normalize_image_bytes(img_bytes: bytes, content_type: str | None) -> Tuple[bytes, str]:
+    if not img_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Empty image file", "detail": "Uploaded image was empty."},
+        )
+
+    if content_type in ALLOWED_IMAGE_TYPES:
+        return img_bytes, content_type
+
+    # For any other image type, convert to JPEG for downstream services.
+    converted = _convert_to_jpeg(img_bytes)
+    return converted, "image/jpeg"
+
+
 async def read_images(
     main_image: UploadFile,
     files: List[UploadFile],
-) -> Tuple[bytes, List[bytes]]:
+) -> Tuple[bytes, List[bytes], str, List[str]]:
     main_bytes = await main_image.read()
-    extra_bytes = []
+    main_bytes, main_content_type = _normalize_image_bytes(main_bytes, main_image.content_type)
+
+    extra_bytes: List[bytes] = []
+    extra_types: List[str] = []
     for f in files:
-        extra_bytes.append(await f.read())
-    return main_bytes, extra_bytes
+        b = await f.read()
+        b, ctype = _normalize_image_bytes(b, f.content_type)
+        extra_bytes.append(b)
+        extra_types.append(ctype)
+
+    return main_bytes, extra_bytes, main_content_type, extra_types
 
 async def embed_main_image(main_bytes: bytes) -> List[List[float]]:
     return await clip_embed_bytes(main_bytes, crops=MAIN_CROPS)

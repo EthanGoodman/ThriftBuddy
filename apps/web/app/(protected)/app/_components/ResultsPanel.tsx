@@ -1,5 +1,3 @@
-import { ExampleListingsList } from "@/components/ExampleListingList";
-import { FullscreenCard } from "@/components/full-screen-modal";
 import { ProgressBar } from "@/components/ProgressBar";
 import { StepColumn } from "@/components/StepColumn";
 import { STREAM_STEPS, StepStatus } from "@/lib/thrift/stream";
@@ -19,6 +17,8 @@ type ResultsPanelProps = {
   combinedSteps: Record<string, StepStatus>;
   activeSteps: Record<string, StepStatus>;
   soldSteps: Record<string, StepStatus>;
+  activeStepMeta: Record<string, { label: string; detail?: string }>;
+  soldStepMeta: Record<string, { label: string; detail?: string }>;
   activeLoading: boolean;
   soldLoading: boolean;
   activeData: FrontendPayload | null;
@@ -42,6 +42,8 @@ export function ResultsPanel({
   combinedSteps,
   activeSteps,
   soldSteps,
+  activeStepMeta,
+  soldStepMeta,
   activeLoading,
   soldLoading,
   activeData,
@@ -53,105 +55,82 @@ export function ResultsPanel({
   onDismissActive,
   onDismissSold,
 }: ResultsPanelProps) {
-  function buildDisplaySteps(stepState: Record<string, string>) {
+  function buildDisplaySteps(
+    stepState: Record<string, string>,
+    stepMeta: Record<string, { label: string; detail?: string }>
+  ) {
     return STREAM_STEPS.flatMap((s) => {
       const st = stepState?.[s.id];
-      if (st === "done") return [{ id: s.id, label: s.label }];
-      if (st === "active") return [{ id: s.id + ":active", label: s.label }];
-      return [];
+      if (st !== "done" && st !== "active") return [];
+
+      const meta = stepMeta?.[s.id];
+      const baseLabel = meta?.label ?? s.label;
+      const detail = meta?.detail?.trim();
+      const label = detail ? `${baseLabel} - ${detail}` : baseLabel;
+
+      if (st === "done") return [{ id: s.id, label }];
+      return [{ id: s.id + ":active", label }];
     });
   }
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-black/5 space-y-5 dark:bg-slate-900 dark:ring-white/10">
-      <div className="space-y-4">
-        {combinedData && !anyBusy ? (
-          <ResultsCards data={combinedData} />
-        ) : (
-          <>
-            {!anyBusy ? (
-              <div className="text-sm text-slate-600 rounded-xl border bg-white dark:border-slate-800 dark:bg-slate-900 p-4">
-                Run Active and/or Sold to see results.
-              </div>
-            ) : (
-              <div className="rounded-xl border bg-white dark:border-slate-800 dark:bg-slate-900 p-4 space-y-4">
-                {(() => {
-                  const showBoth = runActive && runSold;
-                  return (
-                    <>
-                      <div className="w-full">
-                        <div className="pb-4">
-                          <ProgressBar value={overallProgress} isBusy={anyBusy} />
-                        </div>
-                        {showBoth ? (
-                          <StepColumn
-                            title={`Overall (${Math.round(overallProgress * 100)}%)`}
-                            steps={buildDisplaySteps(combinedSteps)}
-                            isLoading={anyBusy}
-                            isDone={!anyBusy && !!activeData && !!soldData && !activeError && !soldError}
-                          />
-                        ) : runActive ? (
-                          <StepColumn
-                            title={`Active (${Math.round(activeProgress * 100)}%)`}
-                            steps={buildDisplaySteps(activeSteps)}
-                            isLoading={activeLoading}
-                            isDone={!activeLoading && !!activeData && !activeError}
-                          />
-                        ) : (
-                          <StepColumn
-                            title={`Sold (${Math.round(soldProgress * 100)}%)`}
-                            steps={buildDisplaySteps(soldSteps)}
-                            isLoading={soldLoading}
-                            isDone={!soldLoading && !!soldData && !soldError}
-                          />
-                        )}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-          </>
-        )}
-
-        {combinedData && !anyBusy && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <FullscreenCard title="Active listings" maxWidthClass="max-w-7xl">
-              {({ fullscreen }) =>
-                activeData?.active_listings?.length ? (
-                  <ExampleListingsList
-                    listings={activeData.active_listings}
-                    fullscreen={fullscreen}
-                    dismissedKeys={dismissedActive}
-                    onDismiss={onDismissActive}
-                  />
-                ) : (
-                  <div className="text-sm text-slate-600 dark:text-slate-300">
-                    {activeLoading ? "Loading active..." : "Run Active to see examples."}
+    <div className="space-y-4">
+      {combinedData && !anyBusy ? (
+        <ResultsCards
+          data={combinedData}
+          activeData={activeData}
+          soldData={soldData}
+          activeLoading={activeLoading}
+          soldLoading={soldLoading}
+          dismissedActive={dismissedActive}
+          dismissedSold={dismissedSold}
+          onDismissActive={onDismissActive}
+          onDismissSold={onDismissSold}
+        />
+      ) : (
+        <>
+          {!anyBusy ? (
+            <div className="rounded-2xl panel-glass p-4 text-sm text-muted">
+              Run Active and/or Sold to see results.
+            </div>
+          ) : (
+            <div className="rounded-2xl panel-glass p-6 space-y-4">
+              {(() => {
+                const showBoth = runActive && runSold;
+                return (
+                  <div className="w-full">
+                    <div className="pb-4">
+                      <ProgressBar value={overallProgress} isBusy={anyBusy} />
+                    </div>
+                    {showBoth ? (
+                      <StepColumn
+                        title={`Overall (${Math.round(overallProgress * 100)}%)`}
+                        steps={buildDisplaySteps(combinedSteps, { ...soldStepMeta, ...activeStepMeta })}
+                        isLoading={anyBusy}
+                        isDone={!anyBusy && !!activeData && !!soldData && !activeError && !soldError}
+                      />
+                    ) : runActive ? (
+                      <StepColumn
+                        title={`Active (${Math.round(activeProgress * 100)}%)`}
+                        steps={buildDisplaySteps(activeSteps, activeStepMeta)}
+                        isLoading={activeLoading}
+                        isDone={!activeLoading && !!activeData && !activeError}
+                      />
+                    ) : (
+                      <StepColumn
+                        title={`Sold (${Math.round(soldProgress * 100)}%)`}
+                        steps={buildDisplaySteps(soldSteps, soldStepMeta)}
+                        isLoading={soldLoading}
+                        isDone={!soldLoading && !!soldData && !soldError}
+                      />
+                    )}
                   </div>
-                )
-              }
-            </FullscreenCard>
-
-            <FullscreenCard title="Sold listings" maxWidthClass="max-w-7xl">
-              {({ fullscreen }) =>
-                soldData?.sold_listings?.length ? (
-                  <ExampleListingsList
-                    listings={soldData.sold_listings}
-                    fullscreen={fullscreen}
-                    dismissedKeys={dismissedSold}
-                    onDismiss={onDismissSold}
-                  />
-                ) : (
-                  <div className="text-sm text-slate-600 dark:text-slate-300">
-                    {soldLoading ? "Loading sold..." : "Run Sold to see examples."}
-                  </div>
-                )
-              }
-            </FullscreenCard>
-          </div>
-        )}
-      </div>
+                );
+              })()}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

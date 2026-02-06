@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Preview, PreviewWithSlot } from "../types";
 
@@ -68,7 +68,7 @@ export function useImageUploads() {
     });
   }
 
-  const clearAllSlots = () => setFiles([null]);
+  const clearAllSlots = useCallback(() => setFiles([null]), []);
 
   const previews: Preview[] = useMemo(() => {
     const list: Preview[] = [];

@@ -4,6 +4,26 @@ import re
 
 TOPK_SIGNAL = 10
 
+_EBAY_SIZE_RE = re.compile(r"(s-l)(\d+)(?=[./?]|$)")
+
+def normalize_ebay_image_url(url: Optional[str], *, target_size: int = 800) -> Optional[str]:
+    if not isinstance(url, str) or not url:
+        return url
+    m = _EBAY_SIZE_RE.search(url)
+    if not m:
+        return url
+    try:
+        current = int(m.group(2))
+    except ValueError:
+        return url
+    if current >= target_size:
+        return url
+    return _EBAY_SIZE_RE.sub(lambda mm: f"{mm.group(1)}{target_size}", url, count=1)
+
+def normalize_marketplace_image_url(url: Optional[str]) -> Optional[str]:
+    # Currently only eBay size tokens are normalized.
+    return normalize_ebay_image_url(url)
+
 def _get_condition(item: Dict[str, Any]) -> Optional[str]:
     c = item.get("condition")
     if not isinstance(c, str) or not c.strip():
@@ -58,11 +78,14 @@ def _strip_heavy_fields(items: List[Dict[str, Any]]) -> None:
       it.pop("_thumb_embedding", None)
 
 def slim_item(it: Dict[str, Any]) -> Dict[str, Any]:
+    raw_image = it.get("image") or it.get("thumbnail")
+    normalized_image = normalize_marketplace_image_url(raw_image)
     return {
         "product_id": it.get("product_id"),
         "title": it.get("title"),
         "link": it.get("link"),
-        "thumbnail": it.get("thumbnail"),
+        "thumbnail": normalize_marketplace_image_url(it.get("thumbnail")),
+        "image": normalized_image,
         "condition": it.get("condition"),
         "price": it.get("price"),
         "shipping": it.get("shipping"),
