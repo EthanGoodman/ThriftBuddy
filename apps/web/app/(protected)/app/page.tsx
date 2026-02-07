@@ -49,7 +49,9 @@ export default function MyNextFastAPIApp() {
   const [lensPanelCollapsed, setLensPanelCollapsed] = useState(false);
   const [screen, setScreen] = useState<AppScreen>("inputs");
 
-  const effectiveItemName = identifyMode === "lens" ? titleDraft : itemName;
+  const safeTitleDraft = typeof titleDraft === "string" ? titleDraft : "";
+  const safeLensTitleDraft = typeof lensTitleDraft === "string" ? lensTitleDraft : "";
+  const effectiveItemName = identifyMode === "lens" ? safeTitleDraft : itemName;
 
   const {
     activeData,
@@ -142,13 +144,13 @@ export default function MyNextFastAPIApp() {
       return;
     }
 
-    setStep(titleDraft.trim() ? "ready_to_analyze" : "pick_match");
+    setStep(safeTitleDraft.trim() ? "ready_to_analyze" : "pick_match");
   }, [
     identifyMode,
     lensLoading,
     lensCandidates.length,
     selectedCandidateId,
-    titleDraft,
+    safeTitleDraft,
     step,
   ]);
 
@@ -197,16 +199,18 @@ export default function MyNextFastAPIApp() {
 
   function selectLensCandidate(candidate: LensCandidate) {
     setSelectedCandidateId(candidate.id);
-    setLensTitleDraft(candidate.title);
-    setTitleDraft(candidate.title);
+    const nextTitle = typeof candidate.title === "string" ? candidate.title : "";
+    setLensTitleDraft(nextTitle);
+    setTitleDraft(nextTitle);
     setIsEditingTitle(false);
     setLensSelectionCollapsed(false);
     setLensPanelCollapsed(false);
   }
 
   function updateLensTitle(value: string) {
-    setLensTitleDraft(value);
-    setTitleDraft(value);
+    const nextTitle = typeof value === "string" ? value : "";
+    setLensTitleDraft(nextTitle);
+    setTitleDraft(nextTitle);
     setLensSelectionCollapsed(false);
     setLensPanelCollapsed(false);
   }
@@ -262,7 +266,7 @@ export default function MyNextFastAPIApp() {
 
   function handleItemNameChange(value: string) {
     if (identifyMode === "lens") {
-      setTitleDraft(value);
+      setTitleDraft(typeof value === "string" ? value : "");
       setIsEditingTitle(true);
       return;
     }
@@ -292,7 +296,7 @@ export default function MyNextFastAPIApp() {
     if (!runActive && !runSold) return;
 
     const mode: Mode = runActive && runSold ? "both" : runActive ? "active" : "sold";
-    const baseTitle = identifyMode === "lens" ? lensTitleDraft : titleDraft;
+    const baseTitle = identifyMode === "lens" ? safeLensTitleDraft : safeTitleDraft;
     const effectiveTitle =
       typeof overrideTitle === "string"
         ? overrideTitle
@@ -357,7 +361,7 @@ export default function MyNextFastAPIApp() {
 
   function handleLensRunAnalysis() {
     if (!selectedCandidateId) return;
-    const chosenTitle = lensTitleDraft.trim();
+    const chosenTitle = safeLensTitleDraft.trim();
     if (!chosenTitle) return;
     setIsEditingTitle(false);
     setScreen("results");
