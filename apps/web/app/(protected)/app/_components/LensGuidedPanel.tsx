@@ -5,7 +5,6 @@ type FlowStep = "inputs" | "identifying" | "pick_match" | "ready_to_analyze" | "
 type LensGuidedPanelProps = {
   candidates: LensCandidate[];
   page: number;
-  pageSize?: number;
   selectedId: string | null;
   selectedTitle: string;
   selectedCandidate?: LensCandidate | null;
@@ -30,7 +29,6 @@ type LensGuidedPanelProps = {
 export function LensGuidedPanel({
   candidates,
   page,
-  pageSize = 5,
   selectedId,
   selectedTitle,
   selectedCandidate = null,
@@ -51,10 +49,11 @@ export function LensGuidedPanel({
   onNext,
   onReset,
 }: LensGuidedPanelProps) {
-  const totalPages = Math.max(1, Math.ceil(candidates.length / pageSize));
-  const clampedPage = Math.min(page, totalPages - 1);
-  const start = clampedPage * pageSize;
-  const pageItems = candidates.slice(start, start + pageSize);
+  const PAGE_SIZE = 2;
+  const pageCount = Math.max(1, Math.ceil(candidates.length / PAGE_SIZE));
+  const pageIndex = Math.min(page, pageCount - 1);
+  const start = pageIndex * PAGE_SIZE;
+  const visible = candidates.slice(start, start + PAGE_SIZE);
   const hasSelection = Boolean(selectedId);
   const hasTitle = Boolean(selectedTitle.trim());
   const isAnalyzing = step === "analyzing";
@@ -198,8 +197,8 @@ export function LensGuidedPanel({
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {pageItems.map((item, index) => {
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {visible.map((item, index) => {
                       const isSelected = selectedId === item.id;
 
                       return (
@@ -209,57 +208,81 @@ export function LensGuidedPanel({
                           tabIndex={0}
                           onClick={() => onSelect(item)}
                           onKeyDown={(e) => {
+                            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                              e.preventDefault();
+                              const direction = e.key === "ArrowUp" ? -1 : 1;
+                              const nextIndex = Math.min(
+                                visible.length - 1,
+                                Math.max(0, index + direction),
+                              );
+                              const nextItem = visible[nextIndex];
+                              if (nextItem) onSelect(nextItem);
+                              return;
+                            }
+                            if (e.key === "ArrowLeft") {
+                              e.preventDefault();
+                              onPrev();
+                              return;
+                            }
+                            if (e.key === "ArrowRight") {
+                              e.preventDefault();
+                              onNext();
+                              return;
+                            }
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
                               onSelect(item);
                             }
                           }}
                           className={[
-                            "flex items-center gap-4 rounded-2xl border p-4 text-left transition",
+                            "flex h-full flex-col overflow-hidden rounded-2xl border text-left transition cursor-pointer",
                             isSelected
                               ? "border-blue-400/50 bg-blue-500/10 ring-1 ring-blue-400/40"
                               : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]",
+                            "min-h-[clamp(11rem,24vh,15rem)]",
                           ].join(" ")}
                         >
-                          <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-white/10 bg-slate-950/60">
+                          <div className="relative w-full overflow-hidden border-b border-white/10 bg-slate-950/60 aspect-[4/3]">
                             <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              {isSelected && isEditingTitle ? (
-                                <input
-                                  type="text"
-                                  value={selectedTitle}
-                                  onChange={(e) => onTitleChange(e.target.value)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                  placeholder="Edit title"
-                                  className="w-full rounded-lg border border-blue-400/40 bg-slate-950/60 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                                />
-                              ) : (
-                                <div className="text-sm font-semibold text-white truncate">
-                                  {isSelected ? selectedTitle || item.title : item.title}
-                                </div>
-                              )}
+                          <div className="flex flex-1 flex-col gap-3 p-[clamp(0.75rem,1.5vw,1.1rem)]">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                {isSelected && isEditingTitle ? (
+                                  <input
+                                    type="text"
+                                    value={selectedTitle}
+                                    onChange={(e) => onTitleChange(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                    placeholder="Edit title"
+                                    className="w-full rounded-lg border border-blue-400/40 bg-slate-950/60 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                  />
+                                ) : (
+                                  <div className="text-sm font-semibold text-white line-clamp-2">
+                                    {isSelected ? selectedTitle || item.title : item.title}
+                                  </div>
+                                )}
+                              </div>
+                              {isSelected ? (
+                                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-200">
+                                  Selected
+                                </span>
+                              ) : null}
                             </div>
-                          </div>
-                          {isSelected ? (
-                            <div className="flex flex-col items-end gap-2">
-                              <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-200">
-                                Selected
-                              </span>
+                            {isSelected ? (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onToggleEdit();
                                 }}
-                                className="text-[11px] font-semibold text-blue-200 hover:text-white"
+                                className="self-start text-[11px] font-semibold text-blue-200 hover:text-white"
                               >
                                 {isEditingTitle ? "Done" : "Edit title"}
                               </button>
-                            </div>
-                          ) : null}
+                            ) : null}
+                          </div>
                         </div>
                       );
                     })}
@@ -271,10 +294,10 @@ export function LensGuidedPanel({
                     <button
                       type="button"
                       onClick={onPrev}
-                      disabled={clampedPage === 0}
+                      disabled={pageIndex === 0}
                       className={[
                         "rounded-full px-3 py-1.5 text-xs font-semibold border transition",
-                        clampedPage === 0
+                        pageIndex === 0
                           ? "bg-white/5 text-muted cursor-not-allowed border-white/5"
                           : "bg-white/5 text-white border-white/10 hover:bg-white/10",
                       ].join(" ")}
@@ -282,15 +305,15 @@ export function LensGuidedPanel({
                       Prev
                     </button>
                     <div className="text-xs text-muted">
-                      Page {clampedPage + 1} of {totalPages}
+                      Page {pageIndex + 1} of {pageCount}
                     </div>
                     <button
                       type="button"
                       onClick={onNext}
-                      disabled={clampedPage >= totalPages - 1}
+                      disabled={pageIndex >= pageCount - 1}
                       className={[
                         "rounded-full px-3 py-1.5 text-xs font-semibold border transition",
-                        clampedPage >= totalPages - 1
+                        pageIndex >= pageCount - 1
                           ? "bg-white/5 text-muted cursor-not-allowed border-white/5"
                           : "bg-white/5 text-white border-white/10 hover:bg-white/10",
                       ].join(" ")}

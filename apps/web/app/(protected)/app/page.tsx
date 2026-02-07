@@ -104,6 +104,10 @@ export default function MyNextFastAPIApp() {
   }, [identifyMode]);
 
   useEffect(() => {
+    setLensPage(0);
+  }, [lensCandidates]);
+
+  useEffect(() => {
     setLensCandidates([]);
     setLensLoading(false);
     setLensError("");
@@ -480,7 +484,7 @@ export default function MyNextFastAPIApp() {
             onPrev={() => setLensPage((p) => Math.max(0, p - 1))}
             onNext={() =>
               setLensPage((p) => {
-                const totalPages = Math.max(1, Math.ceil(lensCandidates.length / 5));
+                const totalPages = Math.max(1, Math.ceil(lensCandidates.length / 2));
                 return Math.min(totalPages - 1, p + 1);
               })
             }

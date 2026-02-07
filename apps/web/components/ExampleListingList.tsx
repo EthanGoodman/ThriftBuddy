@@ -35,8 +35,8 @@ export function ExampleListingsList({
 
   const badgeStyles =
     variant === "sold"
-      ? "bg-emerald-500/15 text-emerald-200"
-      : "bg-blue-500/15 text-blue-200";
+      ? "bg-emerald-500/50 text-emerald-50 ring-1 ring-emerald-300/60 shadow-sm backdrop-blur"
+      : "bg-blue-500/50 text-blue-50 ring-1 ring-blue-300/60 shadow-sm backdrop-blur";
 
   return (
     <div className={fullscreen ? "space-y-4" : "max-h-[360px] overflow-y-auto scrollbar-clean pr-2"}>
