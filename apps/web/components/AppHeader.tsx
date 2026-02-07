@@ -34,13 +34,15 @@ function ThemeToggle({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) =
 
 export default function AppHeader() {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
 
-  const isLanding = pathname === "/" || pathname === "/login" || pathname === "/register";
-  const hideHeader = pathname?.startsWith("/app");
+  const isLanding = mounted && (pathname === "/" || pathname === "/login" || pathname === "/register");
+  const hideHeader = mounted && pathname?.startsWith("/app");
 
   const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
+    setMounted(true);
     const saved = (localStorage.getItem("tb_theme") as Theme | null) ?? "dark";
     setTheme(saved);
   }, []);

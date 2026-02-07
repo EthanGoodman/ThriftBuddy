@@ -326,6 +326,12 @@ export default function MyNextFastAPIApp() {
     setSubmitAttempted(true);
 
     if (identifyMode === "lens") {
+      if (!selectedCandidateId && lensCandidates.length) {
+        setLensError("");
+        setStep("pick_match");
+        setScreen("guided");
+        return;
+      }
       if (!effectiveTitle.trim()) {
         setLensError("Select a match or edit the title before running.");
         setStep("pick_match");

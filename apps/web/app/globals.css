@@ -574,3 +574,187 @@ body {
 .dark .scrollbar-clean {
   scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
 }
+
+.matches-loading {
+  position: relative;
+  overflow: hidden;
+  border-radius: clamp(1rem, 2vw, 1.4rem);
+  background: rgba(10, 16, 34, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 24px 60px rgba(3, 8, 22, 0.45);
+  padding: clamp(1rem, 3vh, 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.85rem, 2.2vh, 1.2rem);
+  isolation: isolate;
+}
+
+.matches-loading > * {
+  position: relative;
+  z-index: 1;
+}
+
+.matches-loading__aurora {
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.2;
+  filter: blur(32px);
+  background:
+    radial-gradient(40% 35% at 20% 25%, rgba(79, 123, 255, 0.35), transparent 70%),
+    radial-gradient(45% 40% at 80% 30%, rgba(99, 102, 241, 0.3), transparent 72%),
+    radial-gradient(50% 45% at 50% 80%, rgba(58, 91, 255, 0.22), transparent 75%);
+  animation: matchesAuroraDrift 8s ease-in-out infinite;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.matches-loading__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.matches-loading__title {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(0.35rem, 1vw, 0.6rem);
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.matches-loading__label {
+  letter-spacing: -0.01em;
+}
+
+.matches-loading__status {
+  font-size: clamp(0.75rem, 1vw, 0.85rem);
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.alive-orb {
+  inline-size: clamp(0.65rem, 1.2vw, 0.85rem);
+  block-size: clamp(0.65rem, 1.2vw, 0.85rem);
+  border-radius: 999px;
+  display: inline-block;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 45%),
+    radial-gradient(circle at 60% 70%, rgba(120, 150, 255, 0.45), rgba(22, 30, 64, 0.85) 70%);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.22),
+    0 0 10px rgba(79, 123, 255, 0.35);
+  opacity: 0.9;
+  animation: aliveOrbPulse 2.2s ease-in-out infinite;
+}
+
+.matches-loading__skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.65rem, 2vh, 0.9rem);
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: clamp(2.6rem, 5vw, 3.4rem) 1fr;
+  gap: clamp(0.7rem, 2vw, 1rem);
+  align-items: center;
+  padding: clamp(0.65rem, 2vh, 0.9rem);
+  border-radius: clamp(0.7rem, 1.4vw, 1rem);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.skeleton-thumb {
+  position: relative;
+  inline-size: clamp(2.2rem, 4.6vw, 3rem);
+  block-size: clamp(2.2rem, 4.6vw, 3rem);
+  border-radius: clamp(0.5rem, 1vw, 0.75rem);
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.skeleton-body {
+  display: grid;
+  gap: clamp(0.35rem, 1vh, 0.5rem);
+}
+
+.skeleton-line {
+  position: relative;
+  height: clamp(0.5rem, 1vh, 0.65rem);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.skeleton-line--title {
+  width: clamp(55%, 60vw, 70%);
+}
+
+.skeleton-line--subtitle {
+  width: clamp(40%, 45vw, 55%);
+  opacity: 0.7;
+}
+
+.skeleton-thumb::after,
+.skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    transparent
+  );
+  transform: translateX(-120%);
+  animation: shimmerSweep 1.9s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes aliveOrbPulse {
+  0% {
+    transform: scale(0.95) translateY(0);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05) translateY(-0.08rem);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95) translateY(0);
+    opacity: 0.85;
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes matchesAuroraDrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-2%, 1.5%, 0) scale(1.03);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matches-loading__aurora,
+  .skeleton-thumb::after,
+  .skeleton-line::after,
+  .alive-orb {
+    animation: none;
+  }
+}

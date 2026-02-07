@@ -55,6 +55,7 @@ export function ResultsPanel({
   onDismissActive,
   onDismissSold,
 }: ResultsPanelProps) {
+  const isSearching = anyBusy || activeLoading || soldLoading;
   function buildDisplaySteps(
     stepState: Record<string, string>,
     stepMeta: Record<string, { label: string; detail?: string }>
@@ -94,19 +95,24 @@ export function ResultsPanel({
               Run Active and/or Sold to see results.
             </div>
           ) : (
-            <div className="rounded-2xl panel-glass p-6 space-y-4">
+            <div
+              className={[
+                "rounded-2xl panel-glass progress-panel p-6 space-y-4",
+                isSearching ? "is-searching" : "",
+              ].join(" ")}
+            >
               {(() => {
                 const showBoth = runActive && runSold;
                 return (
                   <div className="w-full">
                     <div className="pb-4">
-                      <ProgressBar value={overallProgress} isBusy={anyBusy} />
+                      <ProgressBar value={overallProgress} isBusy={isSearching} />
                     </div>
                     {showBoth ? (
                       <StepColumn
                         title={`Overall (${Math.round(overallProgress * 100)}%)`}
                         steps={buildDisplaySteps(combinedSteps, { ...soldStepMeta, ...activeStepMeta })}
-                        isLoading={anyBusy}
+                        isLoading={isSearching}
                         isDone={!anyBusy && !!activeData && !!soldData && !activeError && !soldError}
                       />
                     ) : runActive ? (

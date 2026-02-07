@@ -1,12 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 export default function AppCanvas() {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
 
   // Adjust this if your landing route is not "/"
-  const isLanding = pathname === "/";
+  const isLanding = mounted && pathname === "/";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="pointer-events-none fixed inset-0">

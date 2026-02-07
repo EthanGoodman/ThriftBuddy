@@ -28,6 +28,10 @@ type LensGuidedPanelProps = {
   onReset: () => void;
 };
 
+function stripTrailingEllipsis(value: string) {
+  return value.replace(/(\u2026|\.{3})\s*$/g, "").trim();
+}
+
 export function LensGuidedPanel({
   candidates,
   page,
@@ -177,8 +181,25 @@ export function LensGuidedPanel({
             </div>
 
             {isLoading ? (
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted">
-                Loading matches...
+              <div className="matches-loading" aria-busy="true">
+                <div className="matches-loading__aurora" aria-hidden="true" />
+                <div className="matches-loading__header">
+                  <div className="matches-loading__title">
+                    <span className="matches-loading__label">Finding matches</span>
+                    <span className="alive-orb" aria-hidden="true" />
+                  </div>
+                </div>
+                <div className="matches-loading__skeletons" aria-hidden="true">
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} className="skeleton-row">
+                      <div className="skeleton-thumb" />
+                      <div className="skeleton-body">
+                        <div className="skeleton-line skeleton-line--title" />
+                        <div className="skeleton-line skeleton-line--subtitle" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : error ? (
               <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -195,7 +216,9 @@ export function LensGuidedPanel({
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-xs uppercase tracking-[0.3em] text-blue-200">Selected item</div>
-                        <div className="mt-1 truncate font-semibold">{selectedTitle}</div>
+                        <div className="mt-1 truncate font-semibold">
+                          {stripTrailingEllipsis(selectedTitle)}
+                        </div>
                         <div className="text-xs text-muted">Source: {selectedCandidate.source ?? "lens"}</div>
                       </div>
                       <button
@@ -262,9 +285,9 @@ export function LensGuidedPanel({
                                 {isSelected && isEditingTitle ? (
                                   <textarea
                                     ref={titleInputRef}
-                                    value={selectedTitle}
+                                    value={stripTrailingEllipsis(selectedTitle)}
                                     onChange={(e) => {
-                                      onTitleChange(e.target.value);
+                                      onTitleChange(stripTrailingEllipsis(e.target.value));
                                       const el = e.currentTarget;
                                       el.style.height = "auto";
                                       el.style.height = `${el.scrollHeight}px`;
@@ -277,7 +300,9 @@ export function LensGuidedPanel({
                                   />
                                 ) : (
                                   <div className="text-sm font-semibold text-white line-clamp-2">
-                                    {isSelected ? selectedTitle || item.title : item.title}
+                                    {isSelected
+                                      ? stripTrailingEllipsis(selectedTitle || item.title)
+                                      : stripTrailingEllipsis(item.title)}
                                   </div>
                                 )}
                               </div>
