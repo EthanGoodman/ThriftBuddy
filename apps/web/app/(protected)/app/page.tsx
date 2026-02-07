@@ -225,6 +225,17 @@ export default function MyNextFastAPIApp() {
     setStep("inputs");
   }
 
+  function resetLensSelection() {
+    setSelectedCandidateId(null);
+    setTitleDraft("");
+    setLensTitleDraft("");
+    setIsEditingTitle(false);
+    setLensSelectionCollapsed(false);
+    setLensPanelCollapsed(false);
+    setLensError("");
+    setStep(lensCandidates.length ? "pick_match" : "inputs");
+  }
+
   function handleEditInputs() {
     setScreen("inputs");
   }
@@ -489,18 +500,7 @@ export default function MyNextFastAPIApp() {
               })
             }
             onReset={() => {
-              setIdentifyMode("off");
-              setLensCandidates([]);
-              setLensLoading(false);
-              setLensError("");
-              setLensPage(0);
-              setSelectedCandidateId(null);
-              setTitleDraft("");
-              setLensTitleDraft("");
-              setIsEditingTitle(false);
-              setLensSelectionCollapsed(false);
-              setLensPanelCollapsed(false);
-              setStep("inputs");
+              resetLensSelection();
             }}
           />
         )}

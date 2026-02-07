@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import type { LensCandidate, Preview } from "../types";
 
 type FlowStep = "inputs" | "identifying" | "pick_match" | "ready_to_analyze" | "analyzing" | "done";
@@ -49,6 +51,7 @@ export function LensGuidedPanel({
   onNext,
   onReset,
 }: LensGuidedPanelProps) {
+  const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
   const PAGE_SIZE = 2;
   const pageCount = Math.max(1, Math.ceil(candidates.length / PAGE_SIZE));
   const pageIndex = Math.min(page, pageCount - 1);
@@ -63,6 +66,14 @@ export function LensGuidedPanel({
     : candidates.length
       ? "Google Lens search complete"
       : "Waiting for search";
+
+  useEffect(() => {
+    if (!isEditingTitle) return;
+    const el = titleInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [isEditingTitle, selectedTitle]);
 
   return (
     <div className="rounded-[28px] panel-glass p-6 md:p-10 space-y-6">
@@ -117,15 +128,15 @@ export function LensGuidedPanel({
           <div className="space-y-4">
             <div className="rounded-2xl panel-strong p-4">
               <div className="text-xs uppercase tracking-[0.3em] text-muted">Your image</div>
-              <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-slate-950/60">
+              <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-slate-950/60 aspect-[3/4]">
                 {mainPreview ? (
                   <img
                     src={mainPreview.url}
                     alt={mainPreview.name}
-                    className="h-40 w-full object-contain bg-slate-950/60"
+                    className="h-full w-full object-contain bg-slate-950/60"
                   />
                 ) : (
-                  <div className="flex h-40 items-center justify-center text-xs text-muted">
+                  <div className="flex h-full items-center justify-center text-xs text-muted">
                     Upload a photo to preview
                   </div>
                 )}
@@ -242,21 +253,27 @@ export function LensGuidedPanel({
                             "min-h-[clamp(11rem,24vh,15rem)]",
                           ].join(" ")}
                         >
-                          <div className="relative w-full overflow-hidden border-b border-white/10 bg-slate-950/60 aspect-[4/3]">
+                          <div className="relative w-full overflow-hidden border-b border-white/10 bg-slate-950/60 aspect-[3/4]">
                             <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
                           </div>
                           <div className="flex flex-1 flex-col gap-3 p-[clamp(0.75rem,1.5vw,1.1rem)]">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
                                 {isSelected && isEditingTitle ? (
-                                  <input
-                                    type="text"
+                                  <textarea
+                                    ref={titleInputRef}
                                     value={selectedTitle}
-                                    onChange={(e) => onTitleChange(e.target.value)}
+                                    onChange={(e) => {
+                                      onTitleChange(e.target.value);
+                                      const el = e.currentTarget;
+                                      el.style.height = "auto";
+                                      el.style.height = `${el.scrollHeight}px`;
+                                    }}
                                     onClick={(e) => e.stopPropagation()}
                                     onKeyDown={(e) => e.stopPropagation()}
                                     placeholder="Edit title"
-                                    className="w-full rounded-lg border border-blue-400/40 bg-slate-950/60 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                    rows={2}
+                                    className="w-full min-h-[3rem] resize-none overflow-hidden rounded-lg border border-blue-400/40 bg-slate-950/60 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                                   />
                                 ) : (
                                   <div className="text-sm font-semibold text-white line-clamp-2">
@@ -336,9 +353,6 @@ export function LensGuidedPanel({
                 >
                   Confirm & Search Marketplaces
                 </button>
-                <div className="text-center text-xs text-muted">
-                  {hasSelection ? "Ready to continue." : "Select a product above to continue."}
-                </div>
               </>
             )}
           </div>

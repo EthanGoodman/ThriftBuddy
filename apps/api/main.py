@@ -70,7 +70,7 @@ def validate_image_uploads(main_image: UploadFile, files: List[UploadFile]) -> N
 
 
 def serp_timeout() -> httpx.Timeout:
-    return httpx.Timeout(connect=5.0, read=18.0, write=10.0, pool=5.0)
+    return httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 
 
 async def serp_search(http: httpx.AsyncClient, *, q: str, sold: bool) -> dict:
