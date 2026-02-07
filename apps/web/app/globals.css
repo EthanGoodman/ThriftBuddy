@@ -137,6 +137,55 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.mode-segmented-panel {
+  margin-top: clamp(0.5rem, 1.6vh, 0.85rem);
+}
+
+.mode-segmented {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mode-segment {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mode-segment-label {
+  line-height: 1;
+}
+
+.mode-segment-badge {
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.15);
+  color: rgba(167, 243, 208, 0.95);
+}
+
+.mode-segment-active {
+  background: rgba(79, 123, 255, 0.22);
+  color: white;
+}
+
+.mode-segment-inactive {
+  color: rgba(226, 232, 240, 0.75);
+}
+
 .upload-dropzone {
   display: flex;
   flex-direction: column;
@@ -144,14 +193,14 @@ body {
   justify-content: center;
   gap: clamp(0.75rem, 2vh, 1.25rem);
   padding: clamp(1rem, 3vh, 2.25rem);
-  min-block-size: clamp(18rem, 45vh, 28rem);
+  min-block-size: clamp(18rem, 150vh, 33rem);
   max-block-size: min(50dvh, 32rem);
   border-radius: 1.375rem;
 }
 
 .upload-icon-shell {
-  inline-size: clamp(3rem, 6vw, 4.5rem);
-  block-size: clamp(3rem, 6vw, 4.5rem);
+  inline-size: clamp(3.75rem, 10vh, 5rem);
+  block-size: clamp(3.75rem, 10vh, 5rem);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -159,8 +208,10 @@ body {
 }
 
 .upload-icon {
-  inline-size: clamp(1.5rem, 3vw, 2.25rem);
-  block-size: clamp(1.5rem, 3vw, 2.25rem);
+  inline-size: clamp(1.6rem, 4vh, 2.2rem);
+  block-size: clamp(1.6rem, 4vh, 2.2rem);
+  opacity: 0.85;
+  filter: drop-shadow(0 10px 18px rgba(120, 95, 255, 0.18));
 }
 
 .upload-preview {
@@ -189,6 +240,17 @@ body {
   min-block-size: 0;
   overflow: visible;
   flex: 0 0 auto;
+}
+
+.mode-divider {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0)
+  );
 }
 
 .mode-options {
@@ -319,6 +381,11 @@ body {
   .bg-animated::after {
     animation: none;
   }
+
+  .upload-icon-glow {
+    animation: none;
+    transition: none;
+  }
 }
 
 .upload-drop {
@@ -337,16 +404,112 @@ body {
   animation: uploadShellPulse 3.6s ease-in-out infinite;
 }
 
-.upload-icon-glow {
-  background:
-    radial-gradient(120% 120% at 25% 20%, rgba(255, 255, 255, 0.12), transparent 55%),
-    rgba(18, 28, 58, 0.42);
+.upload-dropzone:hover,
+.upload-dropzone:focus-within,
+.upload-dropzone.is-drag-active,
+.upload-dropzone[data-drag-active="true"] {
+  border-color: rgba(168, 140, 255, 0.55);
+  outline-color: rgba(168, 140, 255, 0.4);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -8px 16px rgba(6, 10, 26, 0.25),
-    0 10px 24px rgba(8, 12, 28, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+    inset 0 0 0 1px rgba(168, 140, 255, 0.15),
+    inset 0 18px 30px rgba(14, 10, 40, 0.28),
+    0 30px 70px rgba(10, 6, 28, 0.5);
+}
+
+.upload-icon-glow {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(160deg, rgba(130, 110, 255, 0.12), rgba(80, 70, 180, 0.08)),
+    rgba(130, 110, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 18px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+  animation: pulseGlow 3.6s ease-in-out infinite;
+}
+
+.upload-icon-glow::before,
+.upload-icon-glow::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.upload-icon-glow::before {
+  inset: -30%;
+  z-index: -1;
+  background: radial-gradient(
+    circle,
+    rgba(130, 110, 255, 0.18),
+    rgba(130, 110, 255, 0) 70%
+  );
+  filter: blur(24px);
+  opacity: 0.6;
+}
+
+.upload-icon-glow::after {
+  inset: 12%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0) 70%
+  );
+  filter: blur(1px);
+  opacity: 0.35;
+}
+
+.upload-dropzone:hover .upload-icon-glow,
+.upload-dropzone:focus-within .upload-icon-glow,
+.upload-dropzone.is-drag-active .upload-icon-glow,
+.upload-dropzone[data-drag-active="true"] .upload-icon-glow {
+  transform: translateY(-0.15rem);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 20px 44px rgba(0, 0, 0, 0.4);
+}
+
+.upload-dropzone:active .upload-icon-glow,
+.upload-dropzone.is-drag-active:active .upload-icon-glow,
+.upload-dropzone[data-drag-active="true"]:active .upload-icon-glow {
+  transform: translateY(0.05rem) scale(0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 16px 36px rgba(0, 0, 0, 0.35);
+}
+
+.upload-dropzone:hover .upload-icon-glow::before,
+.upload-dropzone:focus-within .upload-icon-glow::before,
+.upload-dropzone.is-drag-active .upload-icon-glow::before,
+.upload-dropzone[data-drag-active="true"] .upload-icon-glow::before {
+  opacity: 0.75;
+}
+
+@keyframes pulseGlow {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
 }
 
 @keyframes uploadShellPulse {

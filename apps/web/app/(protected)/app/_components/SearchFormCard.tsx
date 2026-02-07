@@ -71,12 +71,17 @@ export function SearchFormCard({
   const safeTextInput = typeof textInput === "string" ? textInput : "";
   const emptyExtraSlot = Math.max(0, files.findIndex((file) => file == null));
   const extrasSelected = extraPreviews.length > 0;
+  const hasInputs =
+    Boolean(mainImage) ||
+    files.some(Boolean) ||
+    Boolean(safeItemName.trim()) ||
+    Boolean(safeTextInput.trim());
 
   return (
     <div className="rounded-[28px] glass-surface search-form-card">
       <div className="form-header">
         <div />
-        {(hasRunOnce || identifyMode === "lens") && (
+        {(hasRunOnce || (identifyMode === "lens" && hasInputs)) && (
           <button
             type="button"
             onClick={() => setCollapseForm(!collapseForm)}
@@ -190,6 +195,49 @@ export function SearchFormCard({
               />
             </div>
 
+            <div className="mode-segmented-panel">
+              <div className="mode-segmented">
+                <label
+                  className={[
+                    "mode-segment transition",
+                    identifyMode === "lens" ? "mode-segment-active" : "mode-segment-inactive",
+                    anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
+                  ].join(" ")}
+                >
+                  <input
+                    type="radio"
+                    name="analysis-mode"
+                    value="guided"
+                    checked={identifyMode === "lens"}
+                    onChange={() => setIdentifyMode("lens")}
+                    disabled={anyBusy}
+                    className="sr-only"
+                  />
+                  <span className="mode-segment-label">Guided AI</span>
+                  <span className="mode-segment-badge">Recommended</span>
+                </label>
+
+                <label
+                  className={[
+                    "mode-segment transition",
+                    identifyMode === "off" ? "mode-segment-active" : "mode-segment-inactive",
+                    anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
+                  ].join(" ")}
+                >
+                  <input
+                    type="radio"
+                    name="analysis-mode"
+                    value="automatic"
+                    checked={identifyMode === "off"}
+                    onChange={() => setIdentifyMode("off")}
+                    disabled={anyBusy}
+                    className="sr-only"
+                  />
+                  <span className="mode-segment-label">Automatic</span>
+                </label>
+              </div>
+            </div>
+
             {mainPreview ? (
               <div className="form-stack">
                 <div className="section-label text-muted">Optional details</div>
@@ -301,154 +349,13 @@ export function SearchFormCard({
         )}
       </div>
 
-      <div className="mode-panel scrollbar-clean mt-10">
-
-        <div className="mode-options">
-          <label
-            className={[
-              "mode-card group flex items-center justify-between gap-4 rounded-2xl transition",
-              identifyMode === "lens"
-                ? "glass-surface border-blue-400/40 shadow-[0_0_40px_rgba(79,123,255,0.2)]"
-                : "glass-surface-quiet hover:border-white/20 hover:bg-white/[0.04]",
-              anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
-            ].join(" ")}
-          >
-            <input
-              type="radio"
-              name="analysis-mode"
-              value="guided"
-              checked={identifyMode === "lens"}
-              onChange={() => setIdentifyMode("lens")}
-              disabled={anyBusy}
-              className="sr-only"
-            />
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20 text-blue-200">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M12 3C7.029 3 3 7.029 3 12s4.029 9 9 9 9-4.029 9-9"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="text-body font-semibold text-white">Guided AI</div>
-                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-label font-semibold text-emerald-200">
-                    Recommended
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-label text-muted">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    AI identifies
-                  </span>
-                  <span>&gt;</span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    You confirm
-                  </span>
-                  <span>&gt;</span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    Results
-                  </span>
-                </div>
-              </div>
-            </div>
-            <span
-              className={[
-                "h-4 w-4 rounded-full border border-white/20 flex items-center justify-center",
-                identifyMode === "lens" ? "border-blue-400 bg-blue-500/40" : "",
-              ].join(" ")}
-            >
-              {identifyMode === "lens" ? <span className="h-2 w-2 rounded-full bg-blue-300" /> : null}
-            </span>
-          </label>
-
-          <label
-            className={[
-              "mode-card group flex items-center justify-between gap-4 rounded-2xl transition",
-              identifyMode === "off"
-                ? "glass-surface border-blue-300/30 shadow-[0_0_36px_rgba(79,123,255,0.16)]"
-                : "glass-surface-quiet hover:border-white/20 hover:bg-white/[0.04]",
-              anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
-            ].join(" ")}
-          >
-            <input
-              type="radio"
-              name="analysis-mode"
-              value="automatic"
-              checked={identifyMode === "off"}
-              onChange={() => setIdentifyMode("off")}
-              disabled={anyBusy}
-              className="sr-only"
-            />
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M7 12h10M12 7v10"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </span>
-              <div>
-                <div className="text-body font-semibold text-white">Automatic</div>
-                <div className="mt-3 flex items-center gap-2 text-label text-muted">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    Hands Off
-                  </span>
-                  <span>&gt;</span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    Automatic
-                  </span>
-                  <span>&gt;</span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                    Done for you
-                  </span>
-                </div>
-              </div>
-            </div>
-            <span
-              className={[
-                "h-4 w-4 rounded-full border border-white/20 flex items-center justify-center",
-                identifyMode === "off" ? "border-blue-300 bg-blue-500/30" : "",
-              ].join(" ")}
-            >
-              {identifyMode === "off" ? <span className="h-2 w-2 rounded-full bg-blue-200" /> : null}
-            </span>
-          </label>
-        </div>
-
+      <div className="mode-panel scrollbar-clean mt-6">
         <div className="flex flex-wrap items-center gap-3">
           <CheckboxChip checked={runActive} onChange={setRunActive} disabled={anyBusy} label="Active listings" />
           <CheckboxChip checked={runSold} onChange={setRunSold} disabled={anyBusy} label="Sold listings" />
         </div>
+
+        <div className="mode-divider" />
 
         <button
           type="button"
