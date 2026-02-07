@@ -186,95 +186,123 @@ export function ResultsCards({
       >
         <div
           className={[
-            "grid lg:grid-cols-4 transition-all duration-300",
-            isCondensed ? "gap-2" : "gap-4",
+            "grid grid-cols-2 lg:grid-cols-4 transition-all duration-300",
+            isCondensed ? "gap-2" : "gap-3 lg:gap-4",
           ].join(" ")}
         >
-            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+            <div
+              className={[
+                "min-w-0 rounded-2xl panel-strong transition-all",
+                isCondensed ? "p-2.5 lg:p-3" : "p-3 lg:p-5",
+              ].join(" ")}
+            >
               <div
                 className={[
-                  "uppercase tracking-[0.3em] text-muted transition-all",
-                  isCondensed ? "text-[10px]" : "text-xs",
+                  "uppercase tracking-[0.3em] text-muted transition-all truncate whitespace-nowrap",
+                  isCondensed ? "text-[9px] leading-none" : "text-[10px] lg:text-xs",
                 ].join(" ")}
               >
-                Sold pricing
+                <span className="inline lg:hidden">Sold</span>
+                <span className="hidden lg:inline">Sold pricing</span>
               </div>
               {isCondensed ? (
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <div className="text-lg font-semibold text-emerald-200">
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="text-base font-semibold text-emerald-200">
                     {soldMedianAnimated != null ? fmtMoney(soldMedianAnimated) : "No data"}
                   </div>
-                  <div className="text-xs font-semibold text-white">{soldLowHigh}</div>
+                  <div className="text-[10px] font-semibold text-white/70 truncate">{soldLowHigh}</div>
                 </div>
               ) : (
                 <>
-                  <div className="mt-3 text-2xl font-semibold text-emerald-200">
+                  <div className="mt-2 text-lg lg:text-2xl font-semibold text-emerald-200">
                     {soldMedianAnimated != null ? fmtMoney(soldMedianAnimated) : "No data"}
                   </div>
-                  <div className="mt-1 text-xs text-muted">
-                    <div className="text-sm font-semibold text-white">{soldLowHigh}</div>
+                  <div className="mt-0.5 text-[10px] lg:text-xs text-muted">
+                    <div className="text-[11px] lg:text-sm font-semibold text-white/70 truncate">
+                      {soldLowHigh}
+                    </div>
                   </div>
                 </>
               )}
             </div>
-            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+            <div
+              className={[
+                "min-w-0 rounded-2xl panel-strong transition-all",
+                isCondensed ? "p-2.5 lg:p-3" : "p-3 lg:p-5",
+              ].join(" ")}
+            >
               <div
                 className={[
-                  "uppercase tracking-[0.3em] text-muted transition-all",
-                  isCondensed ? "text-[10px]" : "text-xs",
+                  "uppercase tracking-[0.3em] text-muted transition-all truncate whitespace-nowrap",
+                  isCondensed ? "text-[9px] leading-none" : "text-[10px] lg:text-xs",
                 ].join(" ")}
               >
-                Active pricing
+                <span className="inline lg:hidden">Active</span>
+                <span className="hidden lg:inline">Active pricing</span>
               </div>
               {isCondensed ? (
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <div className="text-lg font-semibold text-blue-200">
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="text-base font-semibold text-blue-200">
                     {activeMedianAnimated != null ? fmtMoney(activeMedianAnimated) : "No data"}
                   </div>
-                  <div className="text-xs font-semibold text-white">{activeLowHigh}</div>
+                  <div className="text-[10px] font-semibold text-white/70 truncate">{activeLowHigh}</div>
                 </div>
               ) : (
                 <>
-                  <div className="mt-3 text-2xl font-semibold text-blue-200">
+                  <div className="mt-2 text-lg lg:text-2xl font-semibold text-blue-200">
                     {activeMedianAnimated != null ? fmtMoney(activeMedianAnimated) : "No data"}
                   </div>
-                  <div className="mt-1 text-xs text-muted">
-                    <div className="text-sm font-semibold text-white">{activeLowHigh}</div>
+                  <div className="mt-0.5 text-[10px] lg:text-xs text-muted">
+                    <div className="text-[11px] lg:text-sm font-semibold text-white/70 truncate">
+                      {activeLowHigh}
+                    </div>
                   </div>
                 </>
               )}
             </div>
-            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+            <div
+              className={[
+                "min-w-0 rounded-2xl panel-strong transition-all",
+                isCondensed ? "p-2.5 lg:p-3" : "p-3 lg:p-5",
+              ].join(" ")}
+            >
               <div
                 className={[
-                  "uppercase tracking-[0.3em] text-muted transition-all",
-                  isCondensed ? "text-[10px]" : "text-xs",
+                  "uppercase tracking-[0.3em] text-muted transition-all truncate whitespace-nowrap",
+                  isCondensed ? "text-[9px] leading-none" : "text-[10px] lg:text-xs",
                 ].join(" ")}
               >
-                Recently sold
+                <span className="inline lg:hidden">Recent</span>
+                <span className="hidden lg:inline">Recently sold</span>
               </div>
               <div
                 className={[
-                  "mt-2 font-semibold text-white transition-all",
-                  isCondensed ? "text-lg" : "mt-3 text-2xl",
+                  "mt-1.5 font-semibold text-white transition-all",
+                  isCondensed ? "text-base" : "text-lg lg:text-2xl",
                 ].join(" ")}
               >
                 {soldCount} items
               </div>
             </div>
-            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+            <div
+              className={[
+                "min-w-0 rounded-2xl panel-strong transition-all",
+                isCondensed ? "p-2.5 lg:p-3" : "p-3 lg:p-5",
+              ].join(" ")}
+            >
               <div
                 className={[
-                  "uppercase tracking-[0.3em] text-muted transition-all",
-                  isCondensed ? "text-[10px]" : "text-xs",
+                  "uppercase tracking-[0.3em] text-muted transition-all truncate whitespace-nowrap",
+                  isCondensed ? "text-[9px] leading-none" : "text-[10px] lg:text-xs",
                 ].join(" ")}
               >
-                Active listings
+                <span className="inline lg:hidden">Listed</span>
+                <span className="hidden lg:inline">Active listings</span>
               </div>
               <div
                 className={[
-                  "mt-2 font-semibold text-white transition-all",
-                  isCondensed ? "text-lg" : "mt-3 text-2xl",
+                  "mt-1.5 font-semibold text-white transition-all",
+                  isCondensed ? "text-base" : "text-lg lg:text-2xl",
                 ].join(" ")}
               >
                 {activeCount} items

@@ -393,11 +393,11 @@ async def extract_from_files_stream(
                 sold_ranked = None
                 refined_query = query
 
-                async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0.20, detail="skipped (Item Name provided)"):
+                async for chunk in emit("query_mkt", "Querying marketplaces", "done", 0.20, detail="skipped"):
                     yield chunk
-                async for chunk in emit("proc_imgs", "Processing item images", "done", 0.65, detail="skipped (Item Name provided)"):
+                async for chunk in emit("proc_imgs", "Processing item images", "done", 0.65, detail="skipped"):
                     yield chunk
-                async for chunk in emit("refine", "Refining search query", "done", 0.80, detail="skipped (Item Name provided)"):
+                async for chunk in emit("refine", "Refining search query", "done", 0.80, detail="skipped"):
                     yield chunk
             else:
                 # --- STEP 2: Querying marketplaces (initial) ---
