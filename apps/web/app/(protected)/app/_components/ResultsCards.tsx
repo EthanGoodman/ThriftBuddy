@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/Badge";
 import { ExampleListingsList } from "@/components/ExampleListingList";
+import { listingKey } from "@/lib/thrift/listing";
 import { fmtMoney } from "@/lib/thrift/format";
 
 import type { FrontendPayload, PriceRange } from "../types";
@@ -49,6 +50,53 @@ function formatRange(range: PriceRange) {
   return { lowHigh, iqr };
 }
 
+function useAnimatedNumber(target: number | null, durationMs = 180) {
+  const [display, setDisplay] = useState<number | null>(target);
+  const displayRef = useRef<number | null>(target);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+
+    if (target == null) {
+      displayRef.current = target;
+      setDisplay(target);
+      return;
+    }
+
+    const startValue = displayRef.current ?? target;
+    if (startValue === target) {
+      displayRef.current = target;
+      setDisplay(target);
+      return;
+    }
+
+    const startTime = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / durationMs);
+      const next = startValue + (target - startValue) * t;
+      displayRef.current = next;
+      setDisplay(next);
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(step);
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [target, durationMs]);
+
+  return display;
+}
+
 export function ResultsCards({
   data,
   activeData,
@@ -68,8 +116,16 @@ export function ResultsCards({
   const condensedRef = useRef(false);
   const lastToggleRef = useRef(0);
   const ma = data.market_analysis;
-  const medianSold = medianPrice(soldData?.sold_listings ?? data.sold_listings);
-  const medianActive = medianPrice(activeData?.active_listings ?? data.active_listings);
+  const rawSoldListings = soldData?.sold_listings ?? data.sold_listings;
+  const rawActiveListings = activeData?.active_listings ?? data.active_listings;
+  const filteredSoldListings = rawSoldListings.filter(
+    (it, idx) => !dismissedSold.has(listingKey(it, idx)),
+  );
+  const filteredActiveListings = rawActiveListings.filter(
+    (it, idx) => !dismissedActive.has(listingKey(it, idx)),
+  );
+  const medianSold = medianPrice(filteredSoldListings);
+  const medianActive = medianPrice(filteredActiveListings);
   const soldRange = ma.sold.price_range;
   const activeRange = ma.active.price_range;
   const soldRangeDisplay = formatRange(soldRange);
@@ -78,6 +134,20 @@ export function ResultsCards({
   const activeCount = ma.active.similar_count ?? 0;
   const soldMedianDisplay = soldRange?.median ?? medianSold;
   const activeMedianDisplay = activeRange?.median ?? medianActive;
+  const soldMedianAnimated = useAnimatedNumber(soldMedianDisplay);
+  const activeMedianAnimated = useAnimatedNumber(activeMedianDisplay);
+  const soldLowAnimated = useAnimatedNumber(soldRange?.low ?? null);
+  const soldHighAnimated = useAnimatedNumber(soldRange?.high ?? null);
+  const activeLowAnimated = useAnimatedNumber(activeRange?.low ?? null);
+  const activeHighAnimated = useAnimatedNumber(activeRange?.high ?? null);
+  const soldLowHigh =
+    soldLowAnimated != null && soldHighAnimated != null
+      ? `${fmtMoney(soldLowAnimated)} - ${fmtMoney(soldHighAnimated)}`
+      : soldRangeDisplay.lowHigh;
+  const activeLowHigh =
+    activeLowAnimated != null && activeHighAnimated != null
+      ? `${fmtMoney(activeLowAnimated)} - ${fmtMoney(activeHighAnimated)}`
+      : activeRangeDisplay.lowHigh;
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -110,7 +180,7 @@ export function ResultsCards({
         className={[
           "sticky top-0 z-30 transition-all duration-300",
           isCondensed
-            ? "rounded-b-2xl bg-slate-950/70 p-3 shadow-[0_18px_50px_rgba(2,6,23,0.45)] backdrop-blur-xl"
+            ? "rounded-none bg-slate-950/70 p-3 shadow-[0_18px_50px_rgba(2,6,23,0.45)] backdrop-blur-xl"
             : "bg-transparent",
         ].join(" ")}
       >
@@ -132,17 +202,17 @@ export function ResultsCards({
               {isCondensed ? (
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <div className="text-lg font-semibold text-emerald-200">
-                    {soldMedianDisplay != null ? fmtMoney(soldMedianDisplay) : "No data"}
+                    {soldMedianAnimated != null ? fmtMoney(soldMedianAnimated) : "No data"}
                   </div>
-                  <div className="text-xs font-semibold text-white">{soldRangeDisplay.lowHigh}</div>
+                  <div className="text-xs font-semibold text-white">{soldLowHigh}</div>
                 </div>
               ) : (
                 <>
                   <div className="mt-3 text-2xl font-semibold text-emerald-200">
-                    {soldMedianDisplay != null ? fmtMoney(soldMedianDisplay) : "No data"}
+                    {soldMedianAnimated != null ? fmtMoney(soldMedianAnimated) : "No data"}
                   </div>
                   <div className="mt-1 text-xs text-muted">
-                    <div className="text-sm font-semibold text-white">{soldRangeDisplay.lowHigh}</div>
+                    <div className="text-sm font-semibold text-white">{soldLowHigh}</div>
                   </div>
                 </>
               )}
@@ -159,17 +229,17 @@ export function ResultsCards({
               {isCondensed ? (
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <div className="text-lg font-semibold text-blue-200">
-                    {activeMedianDisplay != null ? fmtMoney(activeMedianDisplay) : "No data"}
+                    {activeMedianAnimated != null ? fmtMoney(activeMedianAnimated) : "No data"}
                   </div>
-                  <div className="text-xs font-semibold text-white">{activeRangeDisplay.lowHigh}</div>
+                  <div className="text-xs font-semibold text-white">{activeLowHigh}</div>
                 </div>
               ) : (
                 <>
                   <div className="mt-3 text-2xl font-semibold text-blue-200">
-                    {activeMedianDisplay != null ? fmtMoney(activeMedianDisplay) : "No data"}
+                    {activeMedianAnimated != null ? fmtMoney(activeMedianAnimated) : "No data"}
                   </div>
                   <div className="mt-1 text-xs text-muted">
-                    <div className="text-sm font-semibold text-white">{activeRangeDisplay.lowHigh}</div>
+                    <div className="text-sm font-semibold text-white">{activeLowHigh}</div>
                   </div>
                 </>
               )}

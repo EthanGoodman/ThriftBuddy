@@ -17,9 +17,9 @@ export function ListingRemoveX({
         "absolute top-2 right-2 z-10",
         "inline-flex items-center justify-center",
         "h-6 w-6 rounded-md", // click target
-        "bg-transparent",
-        "text-white/40 hover:text-white",
-        "hover:bg-white/10",
+        "bg-black/35",
+        "text-white/70 hover:text-white",
+        "hover:bg-red-500/75",
         "active:scale-95 transition",
         // important: only show ring for keyboard focus
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
