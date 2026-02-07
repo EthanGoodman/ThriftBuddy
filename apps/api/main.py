@@ -14,6 +14,8 @@ import time
 from helpers import image_processing, image_ranking, query_refining, output_builder, LLM_Helper
 from auth.routes import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
+from helpers.r2_storage import upload_uploadfile_and_get_url
+
 
 app = FastAPI()
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
@@ -696,21 +698,7 @@ async def extract_file_stream_lens_guided(
     text: Optional[str] = Form(None),
 ):
     try:
-        # NOTE: We still accept files to avoid breaking the client,
-        # but Lens only needs a hosted image URL for now.
-        # ------------------------------------------------------------
-        # Cloudflare R2 upload (COMMENTED OUT FOR NOW)
-        #
-        # main_bytes, _extra_bytes = await image_processing.read_images(main_image, files)
-        # image_url = await r2_storage.upload_bytes_and_get_url(
-        #     bytes_data=main_bytes,
-        #     content_type=main_image.content_type or "image/jpeg",
-        #     filename=main_image.filename or "upload.jpg",
-        #     ttl_seconds=3600,
-        # )
-        # ------------------------------------------------------------
-
-        image_url = "https://i.ebayimg.com/images/g/BuwAAeSweFVorj1v/s-l500.jpg"
+        image_url = await upload_uploadfile_and_get_url(main_image, prefix="tmp")
 
         lens_query = text.strip() if text and text.strip() else None
         lens_json_full = await fetch_google_lens_results(image_url=image_url, q=lens_query)

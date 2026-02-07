@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/Badge";
 import { ExampleListingsList } from "@/components/ExampleListingList";
@@ -62,6 +62,11 @@ export function ResultsCards({
 }: ResultsCardsProps) {
   const [soldExpanded, setSoldExpanded] = useState(false);
   const [activeExpanded, setActiveExpanded] = useState(false);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [isCondensed, setIsCondensed] = useState(false);
+  const condensedRef = useRef(false);
+  const lastToggleRef = useRef(0);
   const ma = data.market_analysis;
   const medianSold = medianPrice(soldData?.sold_listings ?? data.sold_listings);
   const medianActive = medianPrice(activeData?.active_listings ?? data.active_listings);
@@ -74,45 +79,146 @@ export function ResultsCards({
   const soldMedianDisplay = soldRange?.median ?? medianSold;
   const activeMedianDisplay = activeRange?.median ?? medianActive;
 
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const next = !entry.isIntersecting;
+        const now = performance.now();
+        if (next !== condensedRef.current && now - lastToggleRef.current > 120) {
+          condensedRef.current = next;
+          lastToggleRef.current = now;
+          setIsCondensed(next);
+        }
+      },
+      {
+        root: null,
+        threshold: 0,
+        // Make the threshold less sensitive so it doesn't flap.
+        rootMargin: "-24px 0px 0px 0px",
+      },
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 lg:grid-cols-4">
-        <div className="rounded-2xl panel-strong p-5">
-          <div className="text-xs uppercase tracking-[0.3em] text-muted">Sold pricing</div>
-          <div className="mt-3 text-2xl font-semibold text-emerald-200">
-            {soldMedianDisplay != null ? fmtMoney(soldMedianDisplay) : "No data"}
+      <div ref={sentinelRef} className="h-px w-full" />
+      <div
+        ref={headerRef}
+        className={[
+          "sticky top-0 z-30 transition-all duration-300",
+          isCondensed
+            ? "rounded-b-2xl bg-slate-950/70 p-3 shadow-[0_18px_50px_rgba(2,6,23,0.45)] backdrop-blur-xl"
+            : "bg-transparent",
+        ].join(" ")}
+      >
+        <div
+          className={[
+            "grid lg:grid-cols-4 transition-all duration-300",
+            isCondensed ? "gap-2" : "gap-4",
+          ].join(" ")}
+        >
+            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+              <div
+                className={[
+                  "uppercase tracking-[0.3em] text-muted transition-all",
+                  isCondensed ? "text-[10px]" : "text-xs",
+                ].join(" ")}
+              >
+                Sold pricing
+              </div>
+              {isCondensed ? (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <div className="text-lg font-semibold text-emerald-200">
+                    {soldMedianDisplay != null ? fmtMoney(soldMedianDisplay) : "No data"}
+                  </div>
+                  <div className="text-xs font-semibold text-white">{soldRangeDisplay.lowHigh}</div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-3 text-2xl font-semibold text-emerald-200">
+                    {soldMedianDisplay != null ? fmtMoney(soldMedianDisplay) : "No data"}
+                  </div>
+                  <div className="mt-1 text-xs text-muted">
+                    <div className="text-sm font-semibold text-white">{soldRangeDisplay.lowHigh}</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+              <div
+                className={[
+                  "uppercase tracking-[0.3em] text-muted transition-all",
+                  isCondensed ? "text-[10px]" : "text-xs",
+                ].join(" ")}
+              >
+                Active pricing
+              </div>
+              {isCondensed ? (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <div className="text-lg font-semibold text-blue-200">
+                    {activeMedianDisplay != null ? fmtMoney(activeMedianDisplay) : "No data"}
+                  </div>
+                  <div className="text-xs font-semibold text-white">{activeRangeDisplay.lowHigh}</div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-3 text-2xl font-semibold text-blue-200">
+                    {activeMedianDisplay != null ? fmtMoney(activeMedianDisplay) : "No data"}
+                  </div>
+                  <div className="mt-1 text-xs text-muted">
+                    <div className="text-sm font-semibold text-white">{activeRangeDisplay.lowHigh}</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+              <div
+                className={[
+                  "uppercase tracking-[0.3em] text-muted transition-all",
+                  isCondensed ? "text-[10px]" : "text-xs",
+                ].join(" ")}
+              >
+                Recently sold
+              </div>
+              <div
+                className={[
+                  "mt-2 font-semibold text-white transition-all",
+                  isCondensed ? "text-lg" : "mt-3 text-2xl",
+                ].join(" ")}
+              >
+                {soldCount} items
+              </div>
+            </div>
+            <div className={["rounded-2xl panel-strong transition-all", isCondensed ? "p-3" : "p-5"].join(" ")}>
+              <div
+                className={[
+                  "uppercase tracking-[0.3em] text-muted transition-all",
+                  isCondensed ? "text-[10px]" : "text-xs",
+                ].join(" ")}
+              >
+                Active listings
+              </div>
+              <div
+                className={[
+                  "mt-2 font-semibold text-white transition-all",
+                  isCondensed ? "text-lg" : "mt-3 text-2xl",
+                ].join(" ")}
+              >
+                {activeCount} items
+              </div>
+            </div>
           </div>
-          <div className="mt-1 space-y-1 text-xs text-muted">
-            <div className="text-sm font-semibold text-white">{soldRangeDisplay.lowHigh}</div>
-          </div>
-        </div>
-        <div className="rounded-2xl panel-strong p-5">
-          <div className="text-xs uppercase tracking-[0.3em] text-muted">Active pricing</div>
-          <div className="mt-3 text-2xl font-semibold text-blue-200">
-            {activeMedianDisplay != null ? fmtMoney(activeMedianDisplay) : "No data"}
-          </div>
-          <div className="mt-1 space-y-1 text-xs text-muted">
-            <div className="text-sm font-semibold text-white">{activeRangeDisplay.lowHigh}</div>
-          </div>
-        </div>
-        <div className="rounded-2xl panel-strong p-5">
-          <div className="text-xs uppercase tracking-[0.3em] text-muted">Recently sold</div>
-          <div className="mt-3 text-2xl font-semibold text-white">
-            {soldCount} items
-          </div>
-        </div>
-        <div className="rounded-2xl panel-strong p-5">
-          <div className="text-xs uppercase tracking-[0.3em] text-muted">Active listings</div>
-          <div className="mt-3 text-2xl font-semibold text-white">
-            {activeCount} items
-          </div>
-        </div>
-      </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Badge>Velocity: {ma.sell_velocity}</Badge>
-        <Badge>Rarity: {ma.rarity}</Badge>
-        <Badge>Matches: active {ma.active.similar_count} - sold {ma.sold.similar_count}</Badge>
+        {!isCondensed && (
+          <div className="mt-4 flex flex-wrap gap-3 transition-all">
+            <Badge>Velocity: {ma.sell_velocity}</Badge>
+            <Badge>Rarity: {ma.rarity}</Badge>
+            <Badge>Matches: active {ma.active.similar_count} - sold {ma.sold.similar_count}</Badge>
+          </div>
+        )}
       </div>
 
       <div className="space-y-5">
