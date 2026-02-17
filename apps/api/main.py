@@ -1,5 +1,6 @@
 import math
 import re
+import importlib.util
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from openai import OpenAI
@@ -10,6 +11,7 @@ import json
 import os
 import asyncio
 import time
+from pathlib import Path
 
 from helpers import image_processing, image_ranking, query_refining, output_builder, LLM_Helper
 from auth.routes import router as auth_router
@@ -22,8 +24,6 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 from dotenv import load_dotenv
 load_dotenv() 
-
-CLIP_URL = os.environ["CLIP_URL"].rstrip("/")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +41,26 @@ app.add_middleware(
 
 
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+_CLIP_SERVICE = None
+
+
+def _load_clip_service_module():
+    clip_path = Path(__file__).resolve().parent / "clip-service" / "clip_service.py"
+    spec = importlib.util.spec_from_file_location("api_clip_service", str(clip_path))
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load clip service module at {clip_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@app.on_event("startup")
+async def startup_clip_service() -> None:
+    global _CLIP_SERVICE
+    _CLIP_SERVICE = _load_clip_service_module()
+    image_processing.set_clip_service(_CLIP_SERVICE)
+    await asyncio.to_thread(_CLIP_SERVICE.warm_model)
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
 # For stats: keep anything above this similarity

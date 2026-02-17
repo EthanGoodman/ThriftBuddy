@@ -1,12 +1,11 @@
-from typing import Any, Dict, List, Optional, Tuple
-from fastapi import HTTPException, UploadFile
 from io import BytesIO
-from PIL import Image, UnidentifiedImageError
-import httpx
-import asyncio
-import os
+from typing import Any, Dict, List, Optional, Tuple
 
-CLIP_URL = os.environ["CLIP_URL"].rstrip("/")
+import asyncio
+import httpx
+from fastapi import HTTPException, UploadFile
+from PIL import Image, UnidentifiedImageError
+
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # ---- Thumbnail embedding cache (in-memory) ----
@@ -17,6 +16,19 @@ _THUMB_EMBED_CACHE: Dict[str, List[List[float]]] = {}
 MAIN_CROPS = [1.0, 0.85]
 EMBED_MAX_INITIAL = 50
 THUMB_CONCURRENCY = 6
+_CLIP_SERVICE = None
+
+
+def set_clip_service(clip_service_module: Any) -> None:
+    global _CLIP_SERVICE
+    _CLIP_SERVICE = clip_service_module
+
+
+def _get_clip_service() -> Any:
+    if _CLIP_SERVICE is None:
+        raise RuntimeError("CLIP service is not initialized. Ensure startup hook sets it.")
+    return _CLIP_SERVICE
+
 
 async def embed_initial_thumbnails_if_needed(
     *,
@@ -32,6 +44,7 @@ async def embed_initial_thumbnails_if_needed(
         await embed_thumbnails_for_items(
             sold_items, max_items=EMBED_MAX_INITIAL, concurrency=THUMB_CONCURRENCY
         )
+
 
 def _convert_to_jpeg(img_bytes: bytes) -> bytes:
     try:
@@ -63,7 +76,6 @@ def _normalize_image_bytes(img_bytes: bytes, content_type: str | None) -> Tuple[
     if content_type in ALLOWED_IMAGE_TYPES:
         return img_bytes, content_type
 
-    # For any other image type, convert to JPEG for downstream services.
     converted = _convert_to_jpeg(img_bytes)
     return converted, "image/jpeg"
 
@@ -84,6 +96,7 @@ async def read_images(
         extra_types.append(ctype)
 
     return main_bytes, extra_bytes, main_content_type, extra_types
+
 
 async def embed_main_image(main_bytes: bytes) -> List[List[float]]:
     return await clip_embed_bytes(main_bytes, crops=MAIN_CROPS)
@@ -111,7 +124,7 @@ async def embed_thumbnails_for_items(
             if cached is not None:
                 it["_thumb_embedding"] = cached
                 it["_thumb_embed_status"] = "ok_cached"
-                return it, None, cache_key  # None bytes => no embed needed
+                return it, None, cache_key
 
             async with sem:
                 img_bytes = await fetch_image_bytes(thumb_url, http)
@@ -124,7 +137,6 @@ async def embed_thumbnails_for_items(
 
         downloaded = await asyncio.gather(*(download_one(it) for it in target_items))
 
-        # Build batch list for those that actually need embedding
         to_embed_items: List[Dict[str, Any]] = []
         to_embed_bytes: List[bytes] = []
         to_embed_keys: List[str] = []
@@ -139,13 +151,10 @@ async def embed_thumbnails_for_items(
             to_embed_bytes.append(b)
             to_embed_keys.append(cache_key)
 
-        # One shared client for all /embed_batch calls
-        async with httpx.AsyncClient(timeout=30.0) as clip_client:
-            embeds = await clip_embed_batch_bytes(
-                to_embed_bytes,
-                client=clip_client,
-                batch_size=batch_size,
-            )
+        embeds = await clip_embed_batch_bytes(
+            to_embed_bytes,
+            batch_size=batch_size,
+        )
 
         for it, cache_key, vecs in zip(to_embed_items, to_embed_keys, embeds):
             if vecs is None:
@@ -155,7 +164,6 @@ async def embed_thumbnails_for_items(
             it["_thumb_embedding"] = vecs
             it["_thumb_embed_status"] = "ok"
 
-    # summary counts
     counts: Dict[str, int] = {}
     for it in target_items:
         s = it.get("_thumb_embed_status", "unknown")
@@ -165,61 +173,39 @@ async def embed_thumbnails_for_items(
 
 
 async def fetch_image_bytes(url: str, http: httpx.AsyncClient) -> Optional[bytes]:
-    """
-    Download image bytes. Returns None on failure.
-    """
     try:
         r = await http.get(url, timeout=10.0, follow_redirects=True)
         r.raise_for_status()
-        # basic sanity: only accept reasonably sized images
         if not r.content or len(r.content) < 50:
             return None
         return r.content
     except Exception:
         return None
-    
+
+
 async def clip_embed_bytes(img_bytes: bytes, *, crops: List[float]) -> List[List[float]]:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        files = {"image": ("image.jpg", img_bytes, "image/jpeg")}
-        r = await client.post(f"{CLIP_URL}/embed", files=files)
-        r.raise_for_status()
-        return r.json()["embeddings"]
+    clip_service = _get_clip_service()
+    return await asyncio.to_thread(clip_service.image_bytes_to_embeddings_multicrop, img_bytes, crops)
+
 
 async def clip_embed_batch_bytes(
     images: List[bytes],
     *,
-    client: httpx.AsyncClient,
     batch_size: int = 10,
 ) -> List[Optional[List[List[float]]]]:
-    """
-    Calls /embed_batch in chunks. Returns list aligned to `images` where each entry is:
-      - embeddings (List[List[float]]) on success
-      - None on failure for that image
-    """
     out: List[Optional[List[List[float]]]] = []
 
     for i in range(0, len(images), batch_size):
         chunk = images[i : i + batch_size]
+        results = await asyncio.gather(
+            *(clip_embed_bytes(b, crops=MAIN_CROPS) for b in chunk),
+            return_exceptions=True,
+        )
 
-        # IMPORTANT: repeated field name "images"
-        files = [
-            ("images", (f"image_{i+j}.jpg", b, "image/jpeg"))
-            for j, b in enumerate(chunk)
-        ]
-
-        r = await client.post(f"{CLIP_URL}/embed_batch", files=files)
-        r.raise_for_status()
-        payload = r.json()
-
-        # Your clip service returns: {"results": [{"ok": bool, "embeddings": [...]}, ...], "crops": [...]}
-        results = payload.get("results", [])
         for item in results:
-            if item.get("ok"):
-                out.append(item.get("embeddings") or [])
-            else:
+            if isinstance(item, Exception):
                 out.append(None)
+            else:
+                out.append(item)
 
     return out
-
-
-    
