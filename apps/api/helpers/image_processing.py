@@ -8,15 +8,17 @@ from PIL import Image, UnidentifiedImageError
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
-# ---- Thumbnail embedding cache (in-memory) ----
-# Key: product_id (str) OR thumbnail URL as fallback
-_THUMB_EMBED_CACHE: Dict[str, List[List[float]]] = {}
-
-# ---- Image Embedding (OpenCLIP) ----
 MAIN_CROPS = [1.0, 0.85]
-EMBED_MAX_INITIAL = 50
+FAST_CROPS = [1.0]
+EMBED_MAX_INITIAL = 25
+MULTICROP_RERANK_TOP_N = 20
 THUMB_CONCURRENCY = 6
+
 _CLIP_SERVICE = None
+
+# Keyed by product_id (preferred) or thumbnail URL.
+# Value shape: {"1.00": [[...]], "1.00|0.85": [[...], [...]]}
+_THUMB_EMBED_CACHE: Dict[str, Dict[str, List[List[float]]]] = {}
 
 
 def set_clip_service(clip_service_module: Any) -> None:
@@ -30,6 +32,47 @@ def _get_clip_service() -> Any:
     return _CLIP_SERVICE
 
 
+def _crops_key(crops: List[float]) -> str:
+    return "|".join(f"{float(c):.2f}" for c in crops)
+
+
+def _cache_key_for_item(it: Dict[str, Any]) -> Optional[str]:
+    thumb_url = it.get("thumbnail")
+    if not isinstance(thumb_url, str) or not thumb_url.strip():
+        return None
+    return str(it.get("product_id") or thumb_url)
+
+
+def _cache_get(cache_key: str, crops: List[float]) -> Optional[List[List[float]]]:
+    bucket = _THUMB_EMBED_CACHE.get(cache_key)
+    if not bucket:
+        return None
+
+    exact = bucket.get(_crops_key(crops))
+    if exact is not None:
+        return exact
+
+    if crops == FAST_CROPS:
+        full = bucket.get(_crops_key(MAIN_CROPS))
+        if full and len(full) >= 1:
+            return [full[0]]
+
+    return None
+
+
+def _cache_put(cache_key: str, crops: List[float], vecs: List[List[float]]) -> None:
+    _THUMB_EMBED_CACHE.setdefault(cache_key, {})[_crops_key(crops)] = vecs
+
+
+def _apply_embedding_to_item(it: Dict[str, Any], vecs: List[List[float]], crops: List[float]) -> None:
+    it["_thumb_embedding"] = vecs
+    if crops == FAST_CROPS:
+        it["_thumb_embedding_fast"] = vecs
+    if crops == MAIN_CROPS:
+        it["_thumb_embedding_full"] = vecs
+    it["_thumb_embed_status"] = "ok"
+
+
 async def embed_initial_thumbnails_if_needed(
     *,
     active_items: List[dict],
@@ -38,11 +81,17 @@ async def embed_initial_thumbnails_if_needed(
 ) -> None:
     if mode in ("active", "both") and active_items:
         await embed_thumbnails_for_items(
-            active_items, max_items=EMBED_MAX_INITIAL, concurrency=THUMB_CONCURRENCY
+            active_items,
+            max_items=EMBED_MAX_INITIAL,
+            concurrency=THUMB_CONCURRENCY,
+            crops=FAST_CROPS,
         )
     if mode in ("sold", "both") and sold_items:
         await embed_thumbnails_for_items(
-            sold_items, max_items=EMBED_MAX_INITIAL, concurrency=THUMB_CONCURRENCY
+            sold_items,
+            max_items=EMBED_MAX_INITIAL,
+            concurrency=THUMB_CONCURRENCY,
+            crops=FAST_CROPS,
         )
 
 
@@ -98,41 +147,41 @@ async def read_images(
     return main_bytes, extra_bytes, main_content_type, extra_types
 
 
-async def embed_main_image(main_bytes: bytes) -> List[List[float]]:
-    return await clip_embed_bytes(main_bytes, crops=MAIN_CROPS)
+async def embed_main_image(main_bytes: bytes, *, crops: Optional[List[float]] = None) -> List[List[float]]:
+    use_crops = crops or MAIN_CROPS
+    return await clip_embed_bytes(main_bytes, crops=use_crops)
 
 
 async def embed_thumbnails_for_items(
     items: List[Dict[str, Any]],
     *,
-    max_items: int = 50,
-    concurrency: int = 10,
-    batch_size: int = 10,
+    max_items: int = EMBED_MAX_INITIAL,
+    concurrency: int = THUMB_CONCURRENCY,
+    batch_size: int = 24,
+    crops: Optional[List[float]] = None,
 ) -> Dict[str, Any]:
+    use_crops = crops or MAIN_CROPS
     target_items = items[:max_items]
     sem = asyncio.Semaphore(concurrency)
 
     async with httpx.AsyncClient() as http:
         async def download_one(it: Dict[str, Any]) -> Tuple[Dict[str, Any], Optional[bytes], Optional[str]]:
-            thumb_url = it.get("thumbnail")
-            if not isinstance(thumb_url, str) or not thumb_url.strip():
+            cache_key = _cache_key_for_item(it)
+            if not cache_key:
                 it["_thumb_embed_status"] = "no_thumbnail"
                 return it, None, None
 
-            cache_key = str(it.get("product_id") or thumb_url)
-            cached = _THUMB_EMBED_CACHE.get(cache_key)
+            cached = _cache_get(cache_key, use_crops)
             if cached is not None:
-                it["_thumb_embedding"] = cached
+                _apply_embedding_to_item(it, cached, use_crops)
                 it["_thumb_embed_status"] = "ok_cached"
                 return it, None, cache_key
 
             async with sem:
-                img_bytes = await fetch_image_bytes(thumb_url, http)
-
+                img_bytes = await fetch_image_bytes(it["thumbnail"], http)
             if img_bytes is None:
                 it["_thumb_embed_status"] = "download_failed"
-                return it, None, None
-
+                return it, None, cache_key
             return it, img_bytes, cache_key
 
         downloaded = await asyncio.gather(*(download_one(it) for it in target_items))
@@ -153,6 +202,7 @@ async def embed_thumbnails_for_items(
 
         embeds = await clip_embed_batch_bytes(
             to_embed_bytes,
+            crops=use_crops,
             batch_size=batch_size,
         )
 
@@ -160,16 +210,33 @@ async def embed_thumbnails_for_items(
             if vecs is None:
                 it["_thumb_embed_status"] = "embed_failed"
                 continue
-            _THUMB_EMBED_CACHE[cache_key] = vecs
-            it["_thumb_embedding"] = vecs
-            it["_thumb_embed_status"] = "ok"
+            _cache_put(cache_key, use_crops, vecs)
+            _apply_embedding_to_item(it, vecs, use_crops)
 
     counts: Dict[str, int] = {}
     for it in target_items:
         s = it.get("_thumb_embed_status", "unknown")
         counts[s] = counts.get(s, 0) + 1
-
     return {"processed": len(target_items), "status_counts": counts}
+
+
+async def enrich_top_items_with_multicrop(
+    items: List[Dict[str, Any]],
+    *,
+    top_n: int = MULTICROP_RERANK_TOP_N,
+    concurrency: int = THUMB_CONCURRENCY,
+) -> None:
+    ranked = [it for it in items if it.get("_image_similarity") is not None]
+    ranked.sort(key=lambda it: it.get("_image_similarity") or -1.0, reverse=True)
+    top_items = ranked[:top_n]
+    if not top_items:
+        return
+    await embed_thumbnails_for_items(
+        top_items,
+        max_items=top_n,
+        concurrency=concurrency,
+        crops=MAIN_CROPS,
+    )
 
 
 async def fetch_image_bytes(url: str, http: httpx.AsyncClient) -> Optional[bytes]:
@@ -191,21 +258,19 @@ async def clip_embed_bytes(img_bytes: bytes, *, crops: List[float]) -> List[List
 async def clip_embed_batch_bytes(
     images: List[bytes],
     *,
-    batch_size: int = 10,
+    crops: List[float],
+    batch_size: int = 24,
 ) -> List[Optional[List[List[float]]]]:
+    clip_service = _get_clip_service()
     out: List[Optional[List[List[float]]]] = []
 
     for i in range(0, len(images), batch_size):
         chunk = images[i : i + batch_size]
-        results = await asyncio.gather(
-            *(clip_embed_bytes(b, crops=MAIN_CROPS) for b in chunk),
-            return_exceptions=True,
+        batch_result = await asyncio.to_thread(
+            clip_service.image_bytes_batch_to_embeddings,
+            chunk,
+            crops,
         )
-
-        for item in results:
-            if isinstance(item, Exception):
-                out.append(None)
-            else:
-                out.append(item)
+        out.extend(batch_result)
 
     return out

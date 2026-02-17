@@ -238,7 +238,7 @@ async def fetch_initial_serp_results(*, query: str, mode: str) -> Tuple[Optional
     return results[0], results[1]
 
 
-def rerank_initial_for_signal(
+async def rerank_initial_for_signal(
     *,
     active_items: List[dict],
     sold_items: List[dict],
@@ -255,8 +255,30 @@ def rerank_initial_for_signal(
             threshold=SIMILARITY_MIN,
             keep_top_k=None,
         )
+        await image_processing.enrich_top_items_with_multicrop(
+            active_items,
+            top_n=image_processing.MULTICROP_RERANK_TOP_N,
+            concurrency=image_processing.THUMB_CONCURRENCY,
+        )
+        active_ranked = image_ranking.rerank_items_by_image_similarity(
+            active_items,
+            main_vecs,
+            threshold=SIMILARITY_MIN,
+            keep_top_k=None,
+        )
 
     if mode in ("sold", "both") and sold_items:
+        sold_ranked = image_ranking.rerank_items_by_image_similarity(
+            sold_items,
+            main_vecs,
+            threshold=SIMILARITY_MIN,
+            keep_top_k=None,
+        )
+        await image_processing.enrich_top_items_with_multicrop(
+            sold_items,
+            top_n=image_processing.MULTICROP_RERANK_TOP_N,
+            concurrency=image_processing.THUMB_CONCURRENCY,
+        )
         sold_ranked = image_ranking.rerank_items_by_image_similarity(
             sold_items,
             main_vecs,
@@ -317,30 +339,58 @@ async def fetch_final_candidates(
 
     active_items_ref = extract_items(serp_active_ref)
     sold_items_ref = extract_items(serp_sold_ref)
+    active_ranked_final = None
+    sold_ranked_final = None
 
     if mode in ("active", "both") and active_items_ref:
-        await image_processing.embed_thumbnails_for_items(active_items_ref, max_items=50, concurrency=image_processing.THUMB_CONCURRENCY)
+        await image_processing.embed_thumbnails_for_items(
+            active_items_ref,
+            max_items=image_processing.EMBED_MAX_INITIAL,
+            concurrency=image_processing.THUMB_CONCURRENCY,
+            crops=image_processing.FAST_CROPS,
+        )
+        active_ranked_final = image_ranking.rerank_items_by_image_similarity(
+            active_items_ref,
+            main_vecs,
+            threshold=FINAL_SIMILARITY_MIN,
+            keep_top_k=None,
+        )
+        await image_processing.enrich_top_items_with_multicrop(
+            active_items_ref,
+            top_n=image_processing.MULTICROP_RERANK_TOP_N,
+            concurrency=image_processing.THUMB_CONCURRENCY,
+        )
         active_ranked_final = image_ranking.rerank_items_by_image_similarity(
             active_items_ref,
             main_vecs,
             threshold=FINAL_SIMILARITY_MIN,
             keep_top_k=FINAL_KEEP_TOP_K,
         )
-        active_filtered = active_ranked_final["filtered_items"]
-    else:
-        active_filtered = []
 
     if mode in ("sold", "both") and sold_items_ref:
-        await image_processing.embed_thumbnails_for_items(sold_items_ref, max_items=50, concurrency=image_processing.THUMB_CONCURRENCY)
+        await image_processing.embed_thumbnails_for_items(
+            sold_items_ref,
+            max_items=image_processing.EMBED_MAX_INITIAL,
+            concurrency=image_processing.THUMB_CONCURRENCY,
+            crops=image_processing.FAST_CROPS,
+        )
+        sold_ranked_final = image_ranking.rerank_items_by_image_similarity(
+            sold_items_ref,
+            main_vecs,
+            threshold=FINAL_SIMILARITY_MIN,
+            keep_top_k=None,
+        )
+        await image_processing.enrich_top_items_with_multicrop(
+            sold_items_ref,
+            top_n=image_processing.MULTICROP_RERANK_TOP_N,
+            concurrency=image_processing.THUMB_CONCURRENCY,
+        )
         sold_ranked_final = image_ranking.rerank_items_by_image_similarity(
             sold_items_ref,
             main_vecs,
             threshold=FINAL_SIMILARITY_MIN,
             keep_top_k=FINAL_KEEP_TOP_K,
         )
-        sold_filtered = sold_ranked_final["filtered_items"]
-    else:
-        sold_filtered = []
 
     return {
         "active_ranked": active_ranked_final if mode in ("active", "both") else None,
@@ -446,7 +496,7 @@ async def extract_from_files_stream(
 
                 print("4")
 
-                active_ranked, sold_ranked = rerank_initial_for_signal(
+                active_ranked, sold_ranked = await rerank_initial_for_signal(
                     active_items=active_items,
                     sold_items=sold_items,
                     main_vecs=main_vecs,
@@ -494,7 +544,7 @@ async def extract_from_files_stream(
                     sold_items = extract_items(serp_sold)
 
                     await image_processing.embed_initial_thumbnails_if_needed(active_items=active_items, sold_items=sold_items, mode=mode)
-                    active_ranked, sold_ranked = rerank_initial_for_signal(
+                    active_ranked, sold_ranked = await rerank_initial_for_signal(
                         active_items=active_items, sold_items=sold_items, main_vecs=main_vecs, mode=mode
                     )
 

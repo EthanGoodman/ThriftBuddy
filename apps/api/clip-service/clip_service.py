@@ -1,6 +1,7 @@
 from io import BytesIO
-from typing import List
+from typing import List, Optional
 
+from contextlib import nullcontext
 import httpx
 import open_clip
 import torch
@@ -10,8 +11,9 @@ from pydantic import BaseModel, HttpUrl
 
 _CLIP_MODEL = None
 _CLIP_PREPROCESS = None
-_CLIP_DEVICE = "cpu"
+_CLIP_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAIN_CROPS = [1.0, 0.85]
+FAST_CROPS = [1.0]
 
 
 class Candidate(BaseModel):
@@ -41,6 +43,15 @@ def _dot(a: List[float], b: List[float]) -> float:
     return sum(x * y for x, y in zip(a, b))
 
 
+def _crop_image(img: Image.Image, frac: float) -> Image.Image:
+    w, h = img.size
+    side = min(w, h)
+    crop_side = max(1, int(side * float(frac)))
+    left = (w - crop_side) // 2
+    top = (h - crop_side) // 2
+    return img.crop((left, top, left + crop_side, top + crop_side))
+
+
 def load_clip():
     global _CLIP_MODEL, _CLIP_PREPROCESS
     if _CLIP_MODEL is not None:
@@ -66,23 +77,57 @@ def warm_model() -> None:
 def image_bytes_to_embeddings_multicrop(img_bytes: bytes, crops: List[float]) -> List[List[float]]:
     model, preprocess = load_clip()
     img = Image.open(BytesIO(img_bytes)).convert("RGB")
-    w, h = img.size
-    side = min(w, h)
 
     vectors: List[List[float]] = []
     for frac in crops:
-        crop_side = max(1, int(side * float(frac)))
-        left = (w - crop_side) // 2
-        top = (h - crop_side) // 2
-        cropped = img.crop((left, top, left + crop_side, top + crop_side))
-
+        cropped = _crop_image(img, frac)
         image_tensor = preprocess(cropped).unsqueeze(0).to(_CLIP_DEVICE)
-        with torch.no_grad():
+        autocast_ctx = torch.autocast(device_type="cuda", dtype=torch.float16) if _CLIP_DEVICE == "cuda" else nullcontext()
+        with torch.no_grad(), autocast_ctx:
             feats = model.encode_image(image_tensor)
             feats = feats / feats.norm(dim=-1, keepdim=True)
         vectors.append(feats[0].cpu().tolist())
 
     return vectors or [[]]
+
+
+def image_bytes_batch_to_embeddings(
+    images: List[bytes],
+    crops: List[float],
+) -> List[Optional[List[List[float]]]]:
+    model, preprocess = load_clip()
+    decoded: List[Optional[Image.Image]] = []
+
+    for b in images:
+        try:
+            with Image.open(BytesIO(b)) as im:
+                decoded.append(im.convert("RGB"))
+        except Exception:
+            decoded.append(None)
+
+    out: List[List[List[float]]] = [[] for _ in images]
+    valid_indices = [i for i, img in enumerate(decoded) if img is not None]
+    if not valid_indices:
+        return [None for _ in images]
+
+    autocast_ctx = torch.autocast(device_type="cuda", dtype=torch.float16) if _CLIP_DEVICE == "cuda" else nullcontext()
+    with torch.no_grad(), autocast_ctx:
+        for frac in crops:
+            batch_inputs = [preprocess(_crop_image(decoded[i], frac)) for i in valid_indices]
+            image_batch = torch.stack(batch_inputs, dim=0).to(_CLIP_DEVICE)
+            feats = model.encode_image(image_batch)
+            feats = feats / feats.norm(dim=-1, keepdim=True)
+            vecs = feats.cpu().tolist()
+            for idx, vec in zip(valid_indices, vecs):
+                out[idx].append(vec)
+
+    final: List[Optional[List[List[float]]]] = []
+    for i, img in enumerate(decoded):
+        if img is None:
+            final.append(None)
+        else:
+            final.append(out[i] or [[]])
+    return final
 
 
 async def best_match(req: BestMatchRequest):
