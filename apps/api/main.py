@@ -1,3 +1,4 @@
+import datetime
 import math
 import re
 import importlib.util
@@ -12,6 +13,7 @@ import os
 import asyncio
 import time
 from pathlib import Path
+from datetime import datetime
 
 from helpers import image_processing, image_ranking, query_refining, output_builder, LLM_Helper
 from auth.routes import router as auth_router
@@ -298,6 +300,7 @@ async def fetch_final_candidates(
     initial_sold_items: List[dict],
     main_vecs: List[List[float]],
 ) -> Dict[str, Any]:
+    before = datetime.now()
     if not refined_query:
         # build ranked view from initial results so shapes match
         active_ranked_final = None
@@ -312,14 +315,15 @@ async def fetch_final_candidates(
                 initial_sold_items, main_vecs, threshold=FINAL_SIMILARITY_MIN, keep_top_k=FINAL_KEEP_TOP_K
             )
 
+        print(f"Re-ranking items via similarity {datetime.now() - before}")
         return {
             "active_ranked": active_ranked_final,
             "sold_ranked": sold_ranked_final,
             "active_items_ref": initial_active_items,
             "sold_items_ref": initial_sold_items,
         }
-
-
+        
+    before = datetime.now()
     timeout = serp_timeout()
     async with httpx.AsyncClient(timeout=timeout) as http:
         tasks = []
@@ -329,6 +333,7 @@ async def fetch_final_candidates(
             tasks.append(serp_search(http, q=refined_query, sold=True))
 
         results = await asyncio.gather(*tasks)
+    print(f"Getting marketplace results {datetime.now() - before}")
 
     if mode == "active":
         serp_active_ref, serp_sold_ref = results[0], None
@@ -342,6 +347,7 @@ async def fetch_final_candidates(
     active_ranked_final = None
     sold_ranked_final = None
 
+    before = datetime.now()
     if mode in ("active", "both") and active_items_ref:
         await image_processing.embed_thumbnails_for_items(
             active_items_ref,
@@ -391,6 +397,7 @@ async def fetch_final_candidates(
             threshold=FINAL_SIMILARITY_MIN,
             keep_top_k=FINAL_KEEP_TOP_K,
         )
+    print(f"Image stuff {datetime.now() - before}")
 
     return {
         "active_ranked": active_ranked_final if mode in ("active", "both") else None,
