@@ -251,12 +251,6 @@ export function SearchFormCard({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  <path
-                    d="M20 16.5C20 18.9853 17.9853 21 15.5 21H8.5C6.01472 21 4 18.9853 4 16.5V7.5C4 5.01472 6.01472 3 8.5 3H15.5C17.9853 3 20 5.01472 20 7.5V16.5Z"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    opacity="0.4"
-                  />
                 </svg>
               </span>
               <div className="text-upload-title font-semibold text-white">Upload Product Photo</div>
