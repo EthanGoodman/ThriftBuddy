@@ -16,15 +16,15 @@ export function CheckboxChip({
       disabled={disabled}
       className={[
         "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition",
-        "border border-white/10",
+        "border border-[var(--panel-border)]",
         !checked
           ? [
-              "bg-white/5 text-white/80 hover:bg-white/10",
+              "bg-[var(--panel-quiet)] text-[var(--foreground)] hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]",
             ].join(" ")
           : [
-              "bg-blue-500/20 text-white border-blue-400/40 hover:bg-blue-500/30",
+              "bg-[var(--accent)]/16 text-[var(--foreground)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/24",
             ].join(" "),
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/55",
         disabled ? "opacity-60 cursor-not-allowed" : "",
       ].join(" ")}
       aria-pressed={checked}
@@ -34,8 +34,8 @@ export function CheckboxChip({
         className={[
           "grid place-items-center h-5 w-5 rounded-md border transition",
           checked
-            ? "bg-blue-500 border-blue-400/60"
-            : "bg-transparent border-white/20",
+            ? "bg-[var(--accent)] border-[var(--accent)]/60"
+            : "bg-transparent border-[var(--panel-border)]",
         ].join(" ")}
         aria-hidden="true"
       >
@@ -43,7 +43,7 @@ export function CheckboxChip({
           viewBox="0 0 20 20"
           className={[
             "h-3.5 w-3.5 transition",
-            checked ? "text-white opacity-100" : "text-white opacity-0",
+            checked ? "text-[#f9f1e2] opacity-100" : "text-[#f9f1e2] opacity-0",
           ].join(" ")}
           fill="currentColor"
         >

@@ -180,7 +180,7 @@ export function ResultsCards({
         className={[
           "sticky top-0 z-30 transition-all duration-300",
           isCondensed
-            ? "rounded-none bg-slate-950/70 p-3 shadow-[0_18px_50px_rgba(2,6,23,0.45)] backdrop-blur-xl"
+            ? "rounded-none bg-[var(--panel)]/90 p-3 shadow-[0_18px_50px_rgba(67,47,31,0.22)] backdrop-blur-xl"
             : "bg-transparent",
         ].join(" ")}
       >
@@ -207,18 +207,18 @@ export function ResultsCards({
               </div>
               {isCondensed ? (
                 <div className="mt-1.5 flex items-center gap-2">
-                  <div className="text-base font-semibold text-emerald-200">
+                  <div className="text-base font-semibold text-[var(--success)]">
                     {soldMedianAnimated != null ? fmtMoney(soldMedianAnimated) : "No data"}
                   </div>
-                  <div className="text-[10px] font-semibold text-white/70 truncate">{soldLowHigh}</div>
+                  <div className="text-[10px] font-semibold text-[var(--muted)] truncate">{soldLowHigh}</div>
                 </div>
               ) : (
                 <>
-                  <div className="mt-2 text-lg lg:text-2xl font-semibold text-emerald-200">
+                  <div className="mt-2 text-lg lg:text-2xl font-semibold text-[var(--success)]">
                     {soldMedianAnimated != null ? fmtMoney(soldMedianAnimated) : "No data"}
                   </div>
                   <div className="mt-0.5 text-[10px] lg:text-xs text-muted">
-                    <div className="text-[11px] lg:text-sm font-semibold text-white/70 truncate">
+                    <div className="text-[11px] lg:text-sm font-semibold text-[var(--muted)] truncate">
                       {soldLowHigh}
                     </div>
                   </div>
@@ -242,18 +242,18 @@ export function ResultsCards({
               </div>
               {isCondensed ? (
                 <div className="mt-1.5 flex items-center gap-2">
-                  <div className="text-base font-semibold text-blue-200">
+                  <div className="text-base font-semibold text-[var(--accent)]">
                     {activeMedianAnimated != null ? fmtMoney(activeMedianAnimated) : "No data"}
                   </div>
-                  <div className="text-[10px] font-semibold text-white/70 truncate">{activeLowHigh}</div>
+                  <div className="text-[10px] font-semibold text-[var(--muted)] truncate">{activeLowHigh}</div>
                 </div>
               ) : (
                 <>
-                  <div className="mt-2 text-lg lg:text-2xl font-semibold text-blue-200">
+                  <div className="mt-2 text-lg lg:text-2xl font-semibold text-[var(--accent)]">
                     {activeMedianAnimated != null ? fmtMoney(activeMedianAnimated) : "No data"}
                   </div>
                   <div className="mt-0.5 text-[10px] lg:text-xs text-muted">
-                    <div className="text-[11px] lg:text-sm font-semibold text-white/70 truncate">
+                    <div className="text-[11px] lg:text-sm font-semibold text-[var(--muted)] truncate">
                       {activeLowHigh}
                     </div>
                   </div>
@@ -277,7 +277,7 @@ export function ResultsCards({
               </div>
               <div
                 className={[
-                  "mt-1.5 font-semibold text-white transition-all",
+                  "mt-1.5 font-semibold text-[var(--foreground)] transition-all",
                   isCondensed ? "text-base" : "text-lg lg:text-2xl",
                 ].join(" ")}
               >
@@ -301,7 +301,7 @@ export function ResultsCards({
               </div>
               <div
                 className={[
-                  "mt-1.5 font-semibold text-white transition-all",
+                  "mt-1.5 font-semibold text-[var(--foreground)] transition-all",
                   isCondensed ? "text-base" : "text-lg lg:text-2xl",
                 ].join(" ")}
               >
@@ -322,15 +322,15 @@ export function ResultsCards({
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-          <div className="text-sm font-semibold text-white">Recently Sold</div>
-          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
+          <div className="text-sm font-semibold text-[var(--foreground)]">Recently Sold</div>
+          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--success)]">
             {soldCount} items
           </span>
           </div>
           <button
             type="button"
             onClick={() => setSoldExpanded((prev) => !prev)}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white transition hover:bg-white/10"
+            className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
           >
             {soldExpanded ? "Collapse" : "Expand"}
           </button>
@@ -354,15 +354,15 @@ export function ResultsCards({
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-          <div className="text-sm font-semibold text-white">Active Listings</div>
-          <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-200">
+          <div className="text-sm font-semibold text-[var(--foreground)]">Active Listings</div>
+          <span className="rounded-full bg-[var(--accent)]/16 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
             {activeCount} items
           </span>
           </div>
           <button
             type="button"
             onClick={() => setActiveExpanded((prev) => !prev)}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white transition hover:bg-white/10"
+            className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
           >
             {activeExpanded ? "Collapse" : "Expand"}
           </button>
@@ -385,11 +385,11 @@ export function ResultsCards({
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl panel-strong p-5">
-          <div className="text-sm font-semibold text-white">Summary</div>
+          <div className="text-sm font-semibold text-[var(--foreground)]">Summary</div>
           <div className="mt-2 text-sm text-muted leading-relaxed">{data.summary || "-"}</div>
         </div>
         <div className="rounded-2xl panel-strong p-5">
-          <div className="text-sm font-semibold text-white">Legit check (starter)</div>
+          <div className="text-sm font-semibold text-[var(--foreground)]">Legit check (starter)</div>
           {data.legit_check_advice?.length ? (
             <ul className="mt-2 space-y-1 text-sm text-muted">
               {data.legit_check_advice.map((x, i) => (

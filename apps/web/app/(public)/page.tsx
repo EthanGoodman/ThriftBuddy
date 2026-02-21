@@ -3,27 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Theme = "dark" | "light";
-
 const DEMO_STEPS = [
-  "Identifying the item",
-  "Searching marketplaces",
-  "Analyzing marketplace images",
-  "Improving the search",
-  "Finding better matches",
+  "Identify item details",
+  "Scan marketplace comps",
+  "Compare condition and photos",
+  "Refine to best matches",
+  "Estimate resale range",
+] as const;
+
+const TAGLINES = [
+  "Snap it. Name it. Price it.",
+  "Built for thrift finds and flips.",
+  "Warm, practical resale research.",
+  "From dusty rack to clear value.",
 ] as const;
 
 function CheckIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path
-        d="M2 6.5L4.5 9L10 3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M2 6.5L4.5 9L10 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -36,22 +34,14 @@ function DotIcon() {
   );
 }
 
-
-const TAGLINES = [
-  "Identify items from a photo.",
-  "Find comps from sold listings.",
-  "Refine matches with extra angles.",
-  "Price with confidence — fast.",
-] as const;
-
 function useTypewriter(
   phrases: readonly string[],
-  opts?: { typeMs?: number; deleteMs?: number; holdMs?: number; pauseBetweenMs?: number }
+  opts?: { typeMs?: number; deleteMs?: number; holdMs?: number; pauseBetweenMs?: number },
 ) {
-  const typeMs = opts?.typeMs ?? 35;
-  const deleteMs = opts?.deleteMs ?? 22;
-  const holdMs = opts?.holdMs ?? 900;
-  const pauseBetweenMs = opts?.pauseBetweenMs ?? 220;
+  const typeMs = opts?.typeMs ?? 46;
+  const deleteMs = opts?.deleteMs ?? 26;
+  const holdMs = opts?.holdMs ?? 1050;
+  const pauseBetweenMs = opts?.pauseBetweenMs ?? 240;
 
   const [idx, setIdx] = useState(0);
   const [sub, setSub] = useState(0);
@@ -59,18 +49,14 @@ function useTypewriter(
 
   useEffect(() => {
     const phrase = phrases[idx] ?? "";
-    let t: any;
+    let t: ReturnType<typeof setTimeout>;
 
     if (!deleting) {
-      if (sub < phrase.length) {
-        t = setTimeout(() => setSub((s) => s + 1), typeMs);
-      } else {
-        t = setTimeout(() => setDeleting(true), holdMs);
-      }
+      if (sub < phrase.length) t = setTimeout(() => setSub((s) => s + 1), typeMs);
+      else t = setTimeout(() => setDeleting(true), holdMs);
     } else {
-      if (sub > 0) {
-        t = setTimeout(() => setSub((s) => s - 1), deleteMs);
-      } else {
+      if (sub > 0) t = setTimeout(() => setSub((s) => s - 1), deleteMs);
+      else {
         t = setTimeout(() => {
           setDeleting(false);
           setIdx((i) => (i + 1) % phrases.length);
@@ -81,24 +67,18 @@ function useTypewriter(
     return () => clearTimeout(t);
   }, [phrases, idx, sub, deleting, typeMs, deleteMs, holdMs, pauseBetweenMs]);
 
-  const text = (phrases[idx] ?? "").slice(0, sub);
-  return { text, idx };
+  return (phrases[idx] ?? "").slice(0, sub);
 }
 
 function TypeLine() {
-  const { text } = useTypewriter(TAGLINES, {
-    typeMs: 55,
-    deleteMs: 32,
-    holdMs: 1400,
-    pauseBetweenMs: 400,
-  });
+  const text = useTypewriter(TAGLINES);
 
   return (
-    <div className="mt-4 flex items-center gap-2 text-lg text-slate-300 leading-relaxed">
-      <span className="text-blue-300/90">›</span>
+    <div className="mt-4 flex items-center gap-2 text-lg leading-relaxed text-[var(--foreground)]/90">
+      <span className="text-[var(--accent)]">{">"}</span>
       <span className="min-h-[28px]">
         {text}
-        <span className="inline-block w-[10px] translate-y-[2px] animate-[caretBlink_1s_steps(2)_infinite] text-slate-200">
+        <span className="inline-block w-[10px] translate-y-[2px] animate-[caretBlink_1s_steps(2)_infinite] text-[var(--foreground)]">
           |
         </span>
       </span>
@@ -123,84 +103,44 @@ function DemoSteps() {
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => {
-      setActiveIdx((i) => (i + 1) % DEMO_STEPS.length);
-    }, 4000);
+    const t = setInterval(() => setActiveIdx((i) => (i + 1) % DEMO_STEPS.length), 3600);
     return () => clearInterval(t);
   }, []);
 
-  const done = useMemo(() => {
-    return new Set<number>(Array.from({ length: activeIdx }, (_, i) => i));
-  }, [activeIdx]);
+  const done = useMemo(() => new Set<number>(Array.from({ length: activeIdx }, (_, i) => i)), [activeIdx]);
 
   return (
     <div className="mt-7">
-      <div className="text-xs font-semibold text-slate-300/90 mb-3">Live pipeline preview</div>
-
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Live thrift workflow</div>
       <ul className="space-y-2.5">
         {DEMO_STEPS.map((label, idx) => {
           const isActive = idx === activeIdx;
           const isDone = done.has(idx);
-
           return (
             <li key={label} className="flex items-center gap-2.5">
               <span
                 className={[
-                  "grid place-items-center h-5 w-5 rounded-full border text-xs shrink-0",
-                  "bg-white/[0.02]",
+                  "grid h-5 w-5 shrink-0 place-items-center rounded-full border text-xs",
                   isActive
-                    ? "border-blue-400/70 text-blue-400 animate-[softPulse_1.8s_ease-in-out_infinite]"
+                    ? "border-[var(--accent)] text-[var(--accent)] animate-[softPulse_1.8s_ease-in-out_infinite]"
                     : isDone
-                    ? "border-emerald-400/70 text-emerald-400"
-                    : "border-white/10 text-slate-500",
+                      ? "border-[var(--success)] text-[var(--success)]"
+                      : "border-[var(--panel-border)] text-[var(--muted)]",
                 ].join(" ")}
                 aria-hidden="true"
               >
                 {isActive ? <DotIcon /> : isDone ? <CheckIcon /> : null}
               </span>
-
-              <span
-                className={[
-                  "text-sm",
-                  isActive
-                    ? "text-slate-200 animate-[softPulseText_1.8s_ease-in-out_infinite]"
-                    : isDone
-                    ? "text-slate-200/90"
-                    : "text-slate-400/80",
-                ].join(" ")}
-              >
-                {label}
-              </span>
+              <span className={isActive || isDone ? "text-sm text-[var(--foreground)]" : "text-sm text-[var(--muted)]"}>{label}</span>
             </li>
           );
         })}
       </ul>
-
       <style jsx>{`
         @keyframes softPulse {
-          0% {
-            transform: scale(1);
-            opacity: 0.85;
-          }
-          50% {
-            transform: scale(1.05);
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1);
-            opacity: 0.85;
-          }
-        }
-        @keyframes softPulseText {
-          0% {
-            opacity: 0.75;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0.75;
-          }
+          0% { transform: scale(1); opacity: 0.82; }
+          50% { transform: scale(1.06); opacity: 1; }
+          100% { transform: scale(1); opacity: 0.82; }
         }
       `}</style>
     </div>
@@ -210,146 +150,73 @@ function DemoSteps() {
 export default function LandingPage() {
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_BASE_URL!;
-
-  const [theme, setTheme] = useState<Theme>("dark");
   const [entering, setEntering] = useState(false);
-
-  // load saved theme once (default dark)
-  useEffect(() => {
-    const saved = (localStorage.getItem("tb_theme") as Theme | null) ?? "dark";
-    setTheme(saved);
-  }, []);
-
-  // apply theme to <html> via Tailwind "dark" class
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") root.classList.add("dark");
-    else root.classList.remove("dark");
-    localStorage.setItem("tb_theme", theme);
-  }, [theme]);
 
   async function enterApp() {
     if (entering) return;
     setEntering(true);
     try {
-      // Track unique visitor (sets tb_vid cookie + inserts into DB)
       await fetch(`${API}/auth/track`, {
         method: "POST",
         credentials: "include",
       });
     } catch {
-      // If tracking fails, still let them in
+      // Continue to app even if tracking fails.
     } finally {
       router.push("/app");
-      // no need to setEntering(false) since we navigate away
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-      {/* Full-page background effects */}
-      <div className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900" />
-        <div className="absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-blue-600/12 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 h-[520px] w-[520px] rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0)_0%,rgba(0,0,0,0.35)_70%,rgba(0,0,0,0.62)_100%)]" />
-      </div>
-
-      {/* Content wrapper */}
-      <div className="relative mx-auto w-full max-w-7xl px-8">
-        {/* Hero section: vertically centered */}
-        <div className="min-h-[calc(100vh-120px)] grid items-center">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
-            {/* LEFT */}
+    <div className="min-h-screen vintage-landing">
+      <div className="relative mx-auto w-full max-w-7xl px-6 md:px-8">
+        <div className="grid min-h-[calc(100vh-120px)] items-center">
+          <div className="grid grid-cols-1 items-center gap-12 md:grid-cols-2">
             <div className="max-w-xl">
-              <h1 className="text-6xl md:text-7xl font-semibold tracking-tight text-slate-100">
-                <span className="text-blue-400"> Understand true{" "}</span>
-                resale value
+              <h1 className="font-display text-5xl font-semibold tracking-tight text-[var(--foreground)] md:text-7xl">
+                Find true value in every thrifted piece
               </h1>
 
               <TypeLine />
-
               <DemoSteps />
 
-              <div className="mt-7 text-sm text-slate-400/90">Photo → match → comps</div>
+              <div className="mt-7 text-sm uppercase tracking-[0.18em] text-[var(--muted)]">photo {">"} match {">"} comps</div>
             </div>
 
-            {/* RIGHT */}
             <div className="flex md:justify-end">
-              <div className="w-full max-w-md rounded-3xl px-8 py-8 backdrop-blur-xl bg-white/[0.045] ring-1 ring-white/10 relative overflow-hidden">
-                {/* subtle moving glow */}
-                <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl animate-[floatGlow_10s_ease-in-out_infinite]" />
-                <div className="pointer-events-none absolute -bottom-28 -right-28 h-72 w-72 rounded-full bg-emerald-400/8 blur-3xl animate-[floatGlow2_12s_ease-in-out_infinite]" />
-
-                <div className="relative">
-                  {/* Header + chip */}
-                  <div className="flex items-start justify-between gap-4 mb-6">
-                    <div>
-                      <div className="text-base font-semibold text-slate-100">Welcome</div>
-                      <div className="text-sm text-slate-400">Jump into the app — no account needed.</div>
-                    </div>
-
-                    <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1 text-xs text-slate-300 ring-1 ring-white/10">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50 animate-ping" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-                      </span>
-                      open access
-                    </div>
+              <div className="vintage-panel w-full max-w-md rounded-3xl px-8 py-8">
+                <div className="mb-6 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-base font-semibold text-[var(--foreground)]">Welcome</div>
+                    <div className="text-sm text-[var(--muted)]">Jump into the app with no signup friction.</div>
                   </div>
 
-                  {/* Primary action with glow */}
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl opacity-70" />
-                    <button
-                      type="button"
-                      onClick={enterApp}
-                      disabled={entering}
-                      className={[
-                        "relative w-full rounded-2xl px-5 py-3 text-sm font-semibold text-white transition",
-                        entering ? "bg-blue-500/70 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-400",
-                      ].join(" ")}
-                    >
-                      {entering ? "Entering..." : "Enter the app"}
-                    </button>
-                  </div>
-
-                  {/* Secondary (optional) */}
-                  <div className="mt-4 text-xs text-slate-400">
-                    We use a single anonymous cookie to count unique visitors.
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-xs text-[var(--muted)]">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-50 animate-ping" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--success)]" />
+                    </span>
+                    open access
                   </div>
                 </div>
 
-                <style jsx>{`
-                  @keyframes floatGlow {
-                    0% {
-                      transform: translate(0px, 0px);
-                      opacity: 0.65;
-                    }
-                    50% {
-                      transform: translate(22px, 12px);
-                      opacity: 0.85;
-                    }
-                    100% {
-                      transform: translate(0px, 0px);
-                      opacity: 0.65;
-                    }
-                  }
-                  @keyframes floatGlow2 {
-                    0% {
-                      transform: translate(0px, 0px);
-                      opacity: 0.55;
-                    }
-                    50% {
-                      transform: translate(-18px, -10px);
-                      opacity: 0.75;
-                    }
-                    100% {
-                      transform: translate(0px, 0px);
-                      opacity: 0.55;
-                    }
-                  }
-                `}</style>
+                <button
+                  type="button"
+                  onClick={enterApp}
+                  disabled={entering}
+                  className={[
+                    "w-full rounded-2xl px-5 py-3 text-sm font-semibold transition",
+                    entering
+                      ? "cursor-not-allowed bg-[var(--accent)]/70 text-[#f9f1e2]"
+                      : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)]",
+                  ].join(" ")}
+                >
+                  {entering ? "Entering..." : "Enter the app"}
+                </button>
+
+                <div className="mt-4 text-xs text-[var(--muted)]">
+                  We only use one anonymous cookie to count unique visitors.
+                </div>
               </div>
             </div>
           </div>

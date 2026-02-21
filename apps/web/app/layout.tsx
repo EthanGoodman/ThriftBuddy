@@ -1,30 +1,30 @@
 import type { Metadata } from "next";
-import { Manrope, Sora } from "next/font/google";
+import { Cormorant_Garamond, Lora } from "next/font/google";
 import "./globals.css";
 import AppHeader from "@/components/AppHeader";
 import AppCanvas from "@/components/AppCanvas";
 
-const sora = Sora({
+const cormorant = Cormorant_Garamond({
   variable: "--font-display",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
-const manrope = Manrope({
+const lora = Lora({
   variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
   title: "ThriftBuddy",
-  description: "An App Desgined for Thrifters",
+  description: "An App Designed for Thrifters",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body
-        className={`${sora.variable} ${manrope.variable} min-h-screen bg-slate-950 text-slate-100 antialiased`}
-      >
+      <body className={`${cormorant.variable} ${lora.variable} min-h-screen antialiased`}> 
         <AppCanvas />
         <AppHeader />
         <main className="relative z-10">{children}</main>

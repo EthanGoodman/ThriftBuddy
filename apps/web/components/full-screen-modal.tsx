@@ -4,8 +4,7 @@ import { createPortal } from "react-dom";
 
 
 const UTILITY_BTN_CLASS =
-  "text-xs rounded-lg px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 " +
-  "dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-700";
+  "text-xs rounded-lg px-2 py-1 border border-[var(--panel-border)] bg-[var(--panel)] text-[var(--foreground)] hover:bg-[color-mix(in_srgb,var(--panel)_78%,white)]";
 
 export function FullscreenCard({
   title,
@@ -45,18 +44,18 @@ export function FullscreenCard({
           type="button"
           aria-label="Close fullscreen"
           onClick={() => setOpen(false)}
-          className="absolute inset-0 bg-black/60"
+          className="absolute inset-0 bg-[rgba(44,29,19,0.48)]"
         />
 
         <div className="absolute inset-0 p-4 sm:p-8">
           <div
             className={[
-              "mx-auto h-full rounded-2xl bg-white shadow-xl ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/10 flex flex-col",
+              "mx-auto h-full rounded-2xl bg-[var(--panel)] shadow-xl ring-1 ring-[var(--panel-border)] flex flex-col",
               maxWidthClass,
             ].join(" ")}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 dark:border-slate-800/70 px-5 py-4">
-              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--panel-border)]/75 px-5 py-4">
+              <h3 className="text-base font-semibold text-[var(--foreground)]">{title}</h3>
               <button type="button" onClick={() => setOpen(false)} className={UTILITY_BTN_CLASS}>
                 Close
               </button>

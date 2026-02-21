@@ -7,7 +7,7 @@ type ThumbProps = {
 export function Thumb({ p, onOpen, onRemove }: ThumbProps) {
   return (
     <div
-      className=" border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/40 
+      className=" border border-[var(--panel-border)] bg-[var(--panel-quiet)] 
         group relative aspect-square overflow-hidden rounded-lg bg-transparent"
       title="Click to enlarge"
     >
@@ -27,7 +27,7 @@ export function Thumb({ p, onOpen, onRemove }: ThumbProps) {
           onRemove();
         }}
         className="absolute top-1 right-1 z-10 rounded-md
-                    bg-black/60 text-white
+                    bg-[rgba(64,45,31,0.62)] text-[#fff6e7]
                     hover:bg-red-600/80 focus:outline-none
                     focus:ring-2 focus:ring-white/50 aspect-square w-[20px]
                     flex items-center justify-center leading-none"

@@ -5,8 +5,8 @@ import { truncate } from "@/lib/thrift/format";
 
 import type { Preview, PreviewWithSlot } from "../types";
 
-type IdentifyMode = "off" | "lens";
-type FormSectionKey = "upload" | "method" | "details" | "run";
+type IdentifyMode = "off" | "lens" | null;
+type FormSectionKey = "upload" | "method" | "run";
 type StepStatus = "incomplete" | "complete" | "error";
 
 type SearchFormCardProps = {
@@ -65,14 +65,6 @@ function StepIcon({ step }: { step: FormSectionKey }) {
       </svg>
     );
   }
-  if (step === "details") {
-    return (
-      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="step-tab__icon-svg">
-        <path d="M4 3.5H12M4 7H12M4 10.5H8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M10.25 10.6L11.6 12L13.5 9.95" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="step-tab__icon-svg">
       <path d="M3.75 3.75H12.25V12.25H3.75V3.75Z" stroke="currentColor" strokeWidth="1.5" />
@@ -86,8 +78,22 @@ function StepStateIndicator({ status, disabled }: { status: StepStatus; disabled
     return (
       <span className="step-tab__state step-tab__state--disabled" aria-label="Locked">
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M5.5 7V5.75C5.5 4.50736 6.50736 3.5 7.75 3.5C8.99264 3.5 10 4.50736 10 5.75V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          <rect x="4.25" y="7" width="7" height="5.5" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
+          <path
+            d="M6.2 7V5.8C6.2 4.81 7.01 4 8 4C8.99 4 9.8 4.81 9.8 5.8V7"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect
+            x="4.5"
+            y="7"
+            width="7"
+            height="5"
+            rx="1.2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
         </svg>
       </span>
     );
@@ -143,80 +149,88 @@ export function SearchFormCard({
   activeError,
   soldError,
 }: SearchFormCardProps) {
+  const methodInfo: Record<"lens" | "off", { headline: string; bullets: [string, string]; bestFor: string }> = {
+    lens: {
+      headline: "Best accuracy - you confirm the match first.",
+      bullets: ["Pick the closest visual result", "Refine the title for better marketplace search"],
+      bestFor: "Best for brand/model items",
+    },
+    off: {
+      headline: "Lowest effort - search starts from your image.",
+      bullets: ["No match-picking step", "Optional text can improve results"],
+      bestFor: "Best for common items",
+    },
+  };
   const [activeStep, setActiveStep] = useState<FormSectionKey>("upload");
+  const [useGeneratedTitle, setUseGeneratedTitle] = useState(true);
+  const [advancedHelpOpen, setAdvancedHelpOpen] = useState(false);
   const runLabel = anyBusy
     ? "Running..."
-    : identifyMode === "lens"
+    : !identifyMode
+      ? "Choose search method"
+      : identifyMode === "lens"
       ? "Find Matches"
       : "Start Analysis";
   const safeItemName = typeof itemName === "string" ? itemName : "";
   const safeTextInput = typeof textInput === "string" ? textInput : "";
   const emptyExtraSlot = Math.max(0, files.findIndex((file) => file == null));
   const extrasSelected = extraPreviews.length > 0;
-  const hasOptionalDetails =
-    Boolean(safeItemName.trim()) || Boolean(safeTextInput.trim()) || extraPreviews.length > 0;
   const hasInputs =
     Boolean(mainImage) ||
     files.some(Boolean) ||
     Boolean(safeItemName.trim()) ||
     Boolean(safeTextInput.trim());
-  const orderedSteps: FormSectionKey[] = ["upload", "method", "details", "run"];
-  const activeIndex = Math.max(0, orderedSteps.indexOf(activeStep));
-  const progressValue = ((activeIndex + 1) / orderedSteps.length) * 100;
-
-  const steps = useMemo<StepDef[]>(
-    () => [
+  const steps = useMemo<StepDef[]>(() => {
+    const defs: StepDef[] = [
       {
         id: "upload",
         title: "Upload your photo",
         badgeText: "Required",
         required: true,
-        accent: "#37b8ff",
+        accent: "#9b7556",
         status: submitAttempted && !mainImage ? "error" : mainImage ? "complete" : "incomplete",
         disabled: false,
       },
       {
         id: "method",
         title: "Choose a search method",
-        badgeText: identifyMode === "lens" ? "Guided AI" : "Automatic",
+        badgeText: identifyMode === "lens" ? "Guided AI" : identifyMode === "off" ? "Automatic" : "Choose one",
         required: true,
-        accent: "#8b7bff",
-        status: identifyMode ? "complete" : "incomplete",
+        accent: "#8c6f58",
+        status: submitAttempted && !identifyMode ? "error" : identifyMode ? "complete" : "incomplete",
         disabled: !mainImage,
       },
-      {
-        id: "details",
-        title: "Describe the item",
-        badgeText: "Optional",
-        required: false,
-        accent: "#ffaf45",
-        status: hasOptionalDetails ? "complete" : "incomplete",
-        disabled: !mainImage,
-      },
-      {
-        id: "run",
-        title: "Find matches",
-        badgeText: runActive || runSold ? "Ready" : "Select type",
-        required: true,
-        accent: "#35d58e",
-        status: activeError || soldError ? "error" : hasRunOnce ? "complete" : "incomplete",
-        disabled: !mainImage,
-      },
-    ],
-    [
-      activeError,
-      hasOptionalDetails,
-      hasRunOnce,
-      identifyMode,
-      mainImage,
-      runActive,
-      runSold,
-      soldError,
-      submitAttempted,
-    ],
-  );
+    ];
 
-  const activeStepDef = steps.find((step) => step.id === activeStep) ?? steps[0];
+    defs.push({
+      id: "run",
+      title: "Find matches",
+      badgeText: runActive || runSold ? "Ready" : "Select type",
+      required: true,
+      accent: "#7c8c63",
+      status: activeError || soldError ? "error" : hasRunOnce ? "complete" : "incomplete",
+      disabled: !mainImage || !identifyMode,
+    });
+
+    return defs;
+  }, [
+    submitAttempted,
+    mainImage,
+    identifyMode,
+    runActive,
+    runSold,
+    activeError,
+    soldError,
+    hasRunOnce,
+  ]);
+
+  const orderedSteps: FormSectionKey[] = steps.map((s) => s.id);
+  const activeStepId: FormSectionKey = orderedSteps.includes(activeStep)
+    ? activeStep
+    : orderedSteps[0] ?? "upload";
+  const activeIndex = Math.max(0, orderedSteps.indexOf(activeStepId));
+  const progressValue = ((activeIndex + 1) / orderedSteps.length) * 100;
+  const activeStepDef = steps.find((step) => step.id === activeStepId) ?? steps[0];
 
   function selectStep(step: StepDef) {
     if (step.disabled) return;
@@ -232,11 +246,11 @@ export function SearchFormCard({
               htmlFor="main-image-upload"
               className={[
                 "upload-drop upload-dropzone text-center transition",
-                "hover:outline-blue-300/50 hover:shadow-[0_0_60px_rgba(99,102,241,0.2)]",
+                "hover:outline-[var(--accent)]/45 hover:shadow-[0_0_48px_rgba(111,68,45,0.18)]",
                 anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
               ].join(" ")}
             >
-              <span className="upload-icon-glow upload-icon-shell text-blue-100">
+              <span className="upload-icon-glow upload-icon-shell text-[var(--foreground)]">
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
@@ -253,10 +267,10 @@ export function SearchFormCard({
                   />
                 </svg>
               </span>
-              <div className="text-upload-title font-semibold text-white">Upload Product Photo</div>
-              <div className="text-subtitle text-muted">Click to select or drag & drop your image here.</div>
+              <div className="text-upload-title font-semibold text-[var(--foreground)]">Upload Product Photo</div>
+              <div className="text-subtitle text-[var(--muted)]">Click to select or drag & drop your image here.</div>
               {submitAttempted && !mainImage ? (
-                <div className="text-caption text-red-300">Main Image is required to submit.</div>
+                <div className="text-caption text-[var(--danger)]">Main Image is required to submit.</div>
               ) : null}
             </label>
           ) : (
@@ -269,7 +283,7 @@ export function SearchFormCard({
               />
               <label
                 htmlFor="main-image-upload"
-                className="absolute right-4 top-4 rounded-full bg-slate-900/80 px-4 py-1.5 text-caption font-semibold text-white shadow-sm transition hover:bg-slate-900"
+                className="absolute right-4 top-4 rounded-full border border-[rgba(118,92,72,0.42)] bg-[rgba(235,217,191,0.92)] px-4 py-1.5 text-caption font-semibold text-[var(--foreground)] shadow-sm transition hover:bg-[rgba(241,227,205,0.96)]"
               >
                 Change Photo
               </label>
@@ -313,13 +327,21 @@ export function SearchFormCard({
                 checked={identifyMode === "lens"}
                 onChange={() => {
                   setIdentifyMode("lens");
-                  setActiveStep("details");
+                  setUseGeneratedTitle(true);
+                  setAdvancedHelpOpen(false);
+                  setActiveStep("run");
                 }}
                 disabled={anyBusy}
                 className="sr-only"
               />
               <span className="mode-segment-label">Guided AI</span>
-              <span className="mode-segment-badge">Recommended</span>
+              <span
+                className="mode-segment-badge"
+                title="Recommended for best accuracy and fewer wrong listings."
+                aria-label="Recommended for best accuracy and fewer wrong listings."
+              >
+                Recommended
+              </span>
             </label>
 
             <label
@@ -336,7 +358,10 @@ export function SearchFormCard({
                 checked={identifyMode === "off"}
                 onChange={() => {
                   setIdentifyMode("off");
-                  setActiveStep("details");
+                  setUseGeneratedTitle(true);
+                  setAdvancedHelpOpen(false);
+                  setItemName("");
+                  setActiveStep("method");
                 }}
                 disabled={anyBusy}
                 className="sr-only"
@@ -344,123 +369,224 @@ export function SearchFormCard({
               <span className="mode-segment-label">Automatic</span>
             </label>
           </div>
-        </div>
-      );
-    }
-
-    if (stepId === "details") {
-      if (!mainPreview) {
-        return (
-          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-caption text-muted">
-            Upload a photo first, then add optional product details.
-          </div>
-        );
-      }
-      return (
-        <div className="form-stack">
-          <div className="section-label text-muted">Optional details</div>
-
-          <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-3">
-              <label className="text-body font-semibold text-white">
-                Product name <span className="text-muted">(optional, improves accuracy)</span>
-              </label>
-              <input
-                type="text"
-                value={safeItemName}
-                onChange={(e) => setItemName(e.target.value)}
-                placeholder="e.g., Nike Air Jordan 1 Retro High"
-                disabled={anyBusy}
-                className={[
-                  "w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-body text-white",
-                  "placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/50",
-                ].join(" ")}
-              />
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            <div className="rounded-xl border border-[rgba(129,101,78,0.42)] bg-[var(--panel-quiet)]/65 px-3 py-2 ring-0 shadow-none">
+              <div className="text-[12px] font-semibold text-[var(--foreground)] leading-relaxed">
+                {methodInfo.lens.headline}
+              </div>
+              <ul className="mt-1 space-y-0.5 text-[11px] text-[var(--muted)] leading-relaxed">
+                {methodInfo.lens.bullets.map((bullet) => (
+                  <li key={bullet}>- {bullet}</li>
+                ))}
+              </ul>
+              <div className="mt-1 text-[11px] text-[var(--muted)]">{methodInfo.lens.bestFor}</div>
             </div>
+            <div className="rounded-xl border border-[rgba(129,101,78,0.42)] bg-[var(--panel-quiet)]/65 px-3 py-2 ring-0 shadow-none">
+              <div className="text-[12px] font-semibold text-[var(--foreground)] leading-relaxed">
+                {methodInfo.off.headline}
+              </div>
+              <ul className="mt-1 space-y-0.5 text-[11px] text-[var(--muted)] leading-relaxed">
+                {methodInfo.off.bullets.map((bullet) => (
+                  <li key={bullet}>- {bullet}</li>
+                ))}
+              </ul>
+              <div className="mt-1 text-[11px] text-[var(--muted)]">{methodInfo.off.bestFor}</div>
+            </div>
+          </div>
 
-            <div className="space-y-3">
-              <label className="text-body font-semibold text-white">
-                Extra photos <span className="text-muted">(optional)</span>
-              </label>
-              <div className="flex items-center gap-3">
+          {identifyMode === "off" ? (
+            <div className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
+              <div className="text-body font-semibold text-[var(--foreground)]">Automatic search</div>
+              <div className="mt-1 text-caption text-[var(--muted)]">
+                We&apos;ll generate a search title from your image.
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label
-                  htmlFor="extra-image-upload"
                   className={[
-                    "inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-caption font-semibold",
-                    "bg-white/5 text-white transition hover:bg-white/10",
+                    "rounded-lg border px-3 py-2 text-body transition",
+                    useGeneratedTitle
+                      ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--panel-quiet)_72%,white)] text-[var(--foreground)]"
+                      : "border-[var(--panel-border)] bg-transparent text-[var(--muted)] hover:text-[var(--foreground)]",
                     anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
                   ].join(" ")}
                 >
-                  + Add photos
+                  <input
+                    type="radio"
+                    name="automatic-title-mode"
+                    checked={useGeneratedTitle}
+                    onChange={() => {
+                      setUseGeneratedTitle(true);
+                      setItemName("");
+                    }}
+                    disabled={anyBusy}
+                    className="sr-only"
+                  />
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden="true">{useGeneratedTitle ? "●" : "○"}</span>
+                      <span>Generate title automatically</span>
+                    </span>
+                    <span className="rounded-full border border-[var(--panel-border)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)]">
+                      Default
+                    </span>
+                  </span>
                 </label>
-                {extrasSelected ? (
-                  <span className="text-caption text-muted">{extraPreviews.length} added</span>
-                ) : (
-                  <span className="text-caption text-muted">Angles help with variants.</span>
-                )}
-                <input
-                  id="extra-image-upload"
-                  type="file"
-                  accept="image/*"
-                  onClick={(e) => {
-                    (e.currentTarget as HTMLInputElement).value = "";
-                  }}
-                  onChange={(e) => setSlotFile(emptyExtraSlot, e.target.files?.[0] ?? null)}
-                  className="hidden"
-                  disabled={anyBusy}
-                />
+
+                <label
+                  className={[
+                    "rounded-lg border px-3 py-2 text-body transition",
+                    !useGeneratedTitle
+                      ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--panel-quiet)_72%,white)] text-[var(--foreground)]"
+                      : "border-[var(--panel-border)] bg-transparent text-[var(--muted)] hover:text-[var(--foreground)]",
+                    anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
+                  ].join(" ")}
+                >
+                  <input
+                    type="radio"
+                    name="automatic-title-mode"
+                    checked={!useGeneratedTitle}
+                    onChange={() => setUseGeneratedTitle(false)}
+                    disabled={anyBusy}
+                    className="sr-only"
+                  />
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden="true">{!useGeneratedTitle ? "●" : "○"}</span>
+                    <span>Enter title myself</span>
+                  </span>
+                </label>
               </div>
-              {extrasSelected ? (
-                <div className="flex flex-wrap gap-2">
-                  {extraPreviews.map((p) => (
-                    <div
-                      key={p.key}
-                      className="group relative h-12 w-12 overflow-hidden rounded-lg border border-white/10"
-                    >
-                      <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeSlot(p.slotIndex)}
-                        className="absolute -right-1 -top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-slate-900/80 text-caption text-white group-hover:flex"
-                      >
-                        x
-                      </button>
-                    </div>
-                  ))}
-                  {extraPreviews.length > 2 ? (
-                    <button
-                      type="button"
-                      onClick={clearAllSlots}
-                      className="text-caption text-muted underline"
-                    >
-                      Clear all
-                    </button>
-                  ) : null}
+
+              {useGeneratedTitle ? (
+                <div className="mt-3 text-caption text-[var(--muted)]">
+                  We&apos;ll create a search title from your image automatically.
                 </div>
               ) : null}
-            </div>
-          </div>
 
-          <div className="space-y-3">
-            <label className="text-body font-semibold text-white">
-              Details <span className="text-muted">(optional)</span>
-            </label>
-            <textarea
-              value={safeTextInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              placeholder={
-                identifyMode === "lens"
-                  ? "e.g., brand, model, or distinctive marks"
-                  : "e.g., Star Wars DVD set with four discs"
-              }
-              rows={3}
-              disabled={anyBusy}
-              className={[
-                "w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-body text-white",
-                "placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/50",
-              ].join(" ")}
-            />
-          </div>
+              {!useGeneratedTitle ? (
+                <div className="mt-3 space-y-2">
+                  <label className="text-body font-semibold text-[var(--foreground)]">Enter your search title</label>
+                  <div className="text-caption text-[var(--muted)]">
+                    Skips image-based title generation.
+                  </div>
+                  <input
+                    type="text"
+                    value={safeItemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    placeholder="e.g., Coach Edie 36855 Pebble Leather"
+                    disabled={anyBusy}
+                    className={[
+                      "w-full rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-4 py-3 text-body text-[var(--foreground)]",
+                      "placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/45",
+                    ].join(" ")}
+                  />
+                  <div className="text-caption text-[var(--muted)]"></div>
+                </div>
+              ) : null}
+
+              <div className="mt-4 rounded-lg border border-[var(--panel-border)] bg-[color-mix(in_srgb,var(--panel-quiet)_84%,white)]">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedHelpOpen((v) => !v)}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left"
+                  disabled={anyBusy}
+                >
+                  <span className="text-body font-semibold text-[var(--foreground)]">Advanced help (optional)</span>
+                  <span className="text-caption text-[var(--muted)]">{advancedHelpOpen ? "Hide" : "Show"}</span>
+                </button>
+                {advancedHelpOpen ? (
+                  <div className="space-y-4 border-t border-[var(--panel-border)] px-3 py-3">
+                    <div className="space-y-2">
+                      <div className="text-body font-semibold text-[var(--foreground)]">Add extra photos</div>
+                      <div className="text-caption text-[var(--muted)]">
+                        Add angles/labels to help identify variants.
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label
+                          htmlFor="extra-image-upload"
+                          className={[
+                            "inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] px-3 py-1.5 text-caption font-semibold",
+                            "bg-[var(--panel-quiet)] text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]",
+                            anyBusy ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
+                          ].join(" ")}
+                        >
+                          + Add photos
+                        </label>
+                        {extrasSelected ? (
+                          <span className="text-caption text-[var(--muted)]">{extraPreviews.length} added</span>
+                        ) : (
+                          <span className="text-caption text-[var(--muted)]">Angles help with variants.</span>
+                        )}
+                        <input
+                          id="extra-image-upload"
+                          type="file"
+                          accept="image/*"
+                          onClick={(e) => {
+                            (e.currentTarget as HTMLInputElement).value = "";
+                          }}
+                          onChange={(e) => setSlotFile(emptyExtraSlot, e.target.files?.[0] ?? null)}
+                          className="hidden"
+                          disabled={anyBusy}
+                        />
+                      </div>
+                      {extrasSelected ? (
+                        <div className="flex flex-wrap gap-2">
+                          {extraPreviews.map((p) => (
+                            <div
+                              key={p.key}
+                              className="group relative h-12 w-12 overflow-hidden rounded-lg border border-white/10"
+                            >
+                              <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => removeSlot(p.slotIndex)}
+                                className="absolute -right-1 -top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-caption text-[#f9f1e2] group-hover:flex"
+                              >
+                                x
+                              </button>
+                            </div>
+                          ))}
+                          {extraPreviews.length > 2 ? (
+                            <button
+                              type="button"
+                              onClick={clearAllSlots}
+                              className="text-caption text-[var(--muted)] underline"
+                            >
+                              Clear all
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-body font-semibold text-[var(--foreground)]">Add details</div>
+                      <div className="text-caption text-[var(--muted)]">
+                        Mention color, material, size, markings, or damage.
+                      </div>
+                      <textarea
+                        value={safeTextInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        placeholder="e.g., Black pebbled leather, size medium, minor corner wear"
+                        rows={3}
+                        disabled={anyBusy}
+                        className={[
+                          "w-full rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-4 py-3 text-body text-[var(--foreground)]",
+                          "placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/45",
+                        ].join(" ")}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {submitAttempted && !identifyMode ? (
+            <div className="mt-3 text-caption text-[var(--danger)]">
+              Choose Guided AI or Automatic to continue.
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -480,15 +606,15 @@ export function SearchFormCard({
           onClick={onRun}
           className={[
             "w-full rounded-xl px-4 py-3 text-body font-semibold transition",
-            anyBusy || (!runActive && !runSold)
-              ? "bg-white/10 text-muted cursor-not-allowed"
-              : "bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20",
+            anyBusy || (!runActive && !runSold) || !identifyMode
+              ? "bg-white/10 text-[var(--muted)] cursor-not-allowed"
+              : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)] shadow-lg shadow-[rgba(111,68,45,0.25)]",
           ].join(" ")}
         >
           {runLabel}
         </button>
         {activeError || soldError ? (
-          <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-body text-red-200">
+          <div className="rounded-lg border border-[var(--danger)]/35 bg-[var(--danger)]/12 px-4 py-3 text-body text-[var(--danger)]">
             {activeError || soldError}
           </div>
         ) : null}
@@ -507,7 +633,7 @@ export function SearchFormCard({
             disabled={anyBusy}
             className={[
               "rounded-full px-4 py-1.5 text-caption font-semibold transition",
-              "bg-white/10 text-white border border-white/10 hover:bg-white/20",
+              "bg-[var(--panel-quiet)] text-[var(--foreground)] border border-[var(--panel-border)] hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]",
               anyBusy ? "opacity-60 cursor-not-allowed" : "",
             ].join(" ")}
           >
@@ -518,21 +644,21 @@ export function SearchFormCard({
 
       <div className="form-body">
         {collapseForm ? (
-          <div className="rounded-2xl panel-strong panel-compact text-muted">
-            <div className="font-semibold text-white text-body">Current search</div>
+          <div className="rounded-2xl panel-strong panel-compact text-[var(--muted)]">
+            <div className="font-semibold text-[var(--foreground)] text-body">Current search</div>
             <div className="flex flex-wrap gap-3 text-caption">
               <span>Main: {mainImage ? mainImage.name : "None"}</span>
               <span>Extras: {(files.filter(Boolean) as File[]).length}</span>
             </div>
             {safeItemName.trim() || safeTextInput.trim() ? (
-              <div className="text-caption text-muted">
-                <div className="font-medium text-white text-body">
+              <div className="text-caption text-[var(--muted)]">
+                <div className="font-medium text-[var(--foreground)] text-body">
                   {safeItemName.trim() ? truncate(safeItemName, 40) : "No item name"}
                 </div>
-                {safeTextInput.trim() && <div className="text-muted">{safeTextInput}</div>}
+                {safeTextInput.trim() && <div className="text-[var(--muted)]">{safeTextInput}</div>}
               </div>
             ) : (
-              <div className="text-caption text-muted">No optional text provided.</div>
+              <div className="text-caption text-[var(--muted)]">No optional text provided.</div>
             )}
           </div>
         ) : (
@@ -558,7 +684,7 @@ export function SearchFormCard({
 
                 <div className="step-tabs__list">
                   {steps.map((step, index) => {
-                    const isActive = step.id === activeStep;
+                    const isActive = step.id === activeStepId;
                     return (
                       <button
                         key={step.id}
@@ -648,7 +774,7 @@ export function SearchFormCard({
               </div>
 
               {steps.map((step, index) => {
-                const isActive = step.id === activeStep;
+                const isActive = step.id === activeStepId;
                 return (
                   <section
                     key={step.id}
@@ -706,3 +832,4 @@ export function SearchFormCard({
     </div>
   );
 }
+

@@ -35,8 +35,8 @@ export function ExampleListingsList({
 
   const badgeStyles =
     variant === "sold"
-      ? "bg-emerald-500/50 text-emerald-50 ring-1 ring-emerald-300/60 shadow-sm backdrop-blur"
-      : "bg-blue-500/50 text-blue-50 ring-1 ring-blue-300/60 shadow-sm backdrop-blur";
+      ? "bg-[rgba(205,219,191,0.9)] text-[rgba(61,87,55,0.96)] ring-1 ring-[rgba(88,118,78,0.45)] shadow-sm"
+      : "bg-[rgba(229,214,193,0.92)] text-[rgba(94,69,50,0.98)] ring-1 ring-[rgba(127,98,74,0.45)] shadow-sm";
 
   return (
     <div className={fullscreen ? "space-y-4" : "max-h-[360px] overflow-y-auto scrollbar-clean pr-2"}>
@@ -47,7 +47,7 @@ export function ExampleListingsList({
             href={it.link || "#"}
             target="_blank"
             rel="noreferrer"
-            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] transition hover:bg-white/[0.04]"
+            className="group relative overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-quiet)]/72 transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_76%,white)]"
           >
             <ListingRemoveX
               ariaLabel="Remove listing"
@@ -71,18 +71,18 @@ export function ExampleListingsList({
                 </div>
               )}
               <span
-                className={`absolute left-3 top-3 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeStyles}`}
+                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.01em] ${badgeStyles}`}
               >
                 {variant === "sold" ? "Sold recently" : "Active listing"}
               </span>
             </div>
 
             <div className="space-y-2 p-4">
-              <div className="text-sm font-semibold text-white line-clamp-2">
+              <div className="text-sm font-semibold text-[var(--foreground)] line-clamp-2">
                 {it.title || "Untitled listing"}
               </div>
               <div className="flex items-center gap-2 text-xs text-muted">
-                <span className="font-semibold text-emerald-200">
+                <span className="font-semibold text-[var(--accent)]">
                   {it.price?.extracted != null ? fmtMoney(it.price.extracted) : it.price?.raw ?? "-"}
                 </span>
                 {it.condition ? <span>{it.condition}</span> : null}

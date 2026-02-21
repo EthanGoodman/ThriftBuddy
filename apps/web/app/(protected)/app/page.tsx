@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ResultsPanel } from "./_components/ResultsPanel";
 import { LensGuidedPanel } from "./_components/LensGuidedPanel";
@@ -11,7 +11,7 @@ import { useThriftStream } from "./_hooks/useThriftStream";
 import type { LensCandidate, LensCandidatesResponse, Mode } from "./types";
 
 type FlowStep = "inputs" | "identifying" | "pick_match" | "ready_to_analyze" | "analyzing" | "done";
-type IdentifyMode = "off" | "lens";
+type IdentifyMode = "off" | "lens" | null;
 type AppScreen = "inputs" | "guided" | "results";
 
 export default function MyNextFastAPIApp() {
@@ -31,7 +31,7 @@ export default function MyNextFastAPIApp() {
   const [textInput, setTextInput] = useState<string>("");
   const [itemName, setItemName] = useState<string>("");
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [identifyMode, setIdentifyMode] = useState<IdentifyMode>("lens");
+  const [identifyMode, setIdentifyMode] = useState<IdentifyMode>(null);
   const [step, setStep] = useState<FlowStep>("inputs");
   const [runActive, setRunActive] = useState(true);
   const [runSold, setRunSold] = useState(false);
@@ -45,8 +45,6 @@ export default function MyNextFastAPIApp() {
   const [titleDraft, setTitleDraft] = useState("");
   const [lensTitleDraft, setLensTitleDraft] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [lensSelectionCollapsed, setLensSelectionCollapsed] = useState(false);
-  const [lensPanelCollapsed, setLensPanelCollapsed] = useState(false);
   const [screen, setScreen] = useState<AppScreen>("inputs");
 
   const safeTitleDraft = typeof titleDraft === "string" ? titleDraft : "";
@@ -88,8 +86,18 @@ export default function MyNextFastAPIApp() {
     runSold,
   });
 
+  const abortAllRef = useRef(abortAll);
+  const clearModeCompletelyRef = useRef(clearModeCompletely);
+  const clearErrorsRef = useRef(clearErrors);
+
   useEffect(() => {
-    if (identifyMode === "off") {
+    abortAllRef.current = abortAll;
+    clearModeCompletelyRef.current = clearModeCompletely;
+    clearErrorsRef.current = clearErrors;
+  }, [abortAll, clearModeCompletely, clearErrors]);
+
+  useEffect(() => {
+    if (identifyMode !== "lens") {
       setLensCandidates([]);
       setLensLoading(false);
       setLensError("");
@@ -98,8 +106,6 @@ export default function MyNextFastAPIApp() {
       setTitleDraft("");
       setLensTitleDraft("");
       setIsEditingTitle(false);
-      setLensSelectionCollapsed(false);
-      setLensPanelCollapsed(false);
       setStep("inputs");
       setScreen("inputs");
     }
@@ -110,6 +116,10 @@ export default function MyNextFastAPIApp() {
   }, [lensCandidates]);
 
   useEffect(() => {
+    abortAllRef.current();
+    clearModeCompletelyRef.current("active");
+    clearModeCompletelyRef.current("sold");
+
     setLensCandidates([]);
     setLensLoading(false);
     setLensError("");
@@ -118,12 +128,16 @@ export default function MyNextFastAPIApp() {
     setTitleDraft("");
     setLensTitleDraft("");
     setIsEditingTitle(false);
-    setLensSelectionCollapsed(false);
-    setLensPanelCollapsed(false);
+    setIdentifyMode(null);
+    setItemName("");
+    setTextInput("");
+    setHasRunOnce(false);
+    setCollapseForm(false);
+    setSubmitAttempted(false);
     setStep("inputs");
     setScreen("inputs");
-    clearErrors("both");
-  }, [mainImage, clearErrors]);
+    clearErrorsRef.current("both");
+  }, [mainImage]);
 
   useEffect(() => {
     if (identifyMode !== "lens") return;
@@ -186,8 +200,6 @@ export default function MyNextFastAPIApp() {
       setTitleDraft("");
       setLensTitleDraft("");
       setIsEditingTitle(false);
-      setLensSelectionCollapsed(false);
-      setLensPanelCollapsed(false);
       setStep(candidates.length ? "pick_match" : "inputs");
       setScreen(candidates.length ? "guided" : "inputs");
     } catch (e: any) {
@@ -203,16 +215,12 @@ export default function MyNextFastAPIApp() {
     setLensTitleDraft(nextTitle);
     setTitleDraft(nextTitle);
     setIsEditingTitle(false);
-    setLensSelectionCollapsed(false);
-    setLensPanelCollapsed(false);
   }
 
   function updateLensTitle(value: string) {
     const nextTitle = typeof value === "string" ? value : "";
     setLensTitleDraft(nextTitle);
     setTitleDraft(nextTitle);
-    setLensSelectionCollapsed(false);
-    setLensPanelCollapsed(false);
   }
 
   function resetLensState() {
@@ -224,8 +232,6 @@ export default function MyNextFastAPIApp() {
     setTitleDraft("");
     setLensTitleDraft("");
     setIsEditingTitle(false);
-    setLensSelectionCollapsed(false);
-    setLensPanelCollapsed(false);
     setStep("inputs");
   }
 
@@ -234,8 +240,6 @@ export default function MyNextFastAPIApp() {
     setTitleDraft("");
     setLensTitleDraft("");
     setIsEditingTitle(false);
-    setLensSelectionCollapsed(false);
-    setLensPanelCollapsed(false);
     setLensError("");
     setStep(lensCandidates.length ? "pick_match" : "inputs");
   }
@@ -259,7 +263,7 @@ export default function MyNextFastAPIApp() {
     setCollapseForm(false);
     setRunActive(true);
     setRunSold(false);
-    setIdentifyMode("lens");
+    setIdentifyMode(null);
     resetLensState();
     setScreen("inputs");
   }
@@ -304,6 +308,13 @@ export default function MyNextFastAPIApp() {
           ? baseTitle
           : "";
 
+    if (!identifyMode) {
+      setSubmitAttempted(true);
+      setCollapseForm(false);
+      setScreen("inputs");
+      return;
+    }
+
     if (identifyMode === "lens" && !lensCandidates.length && !lensLoading) {
       setLensError("");
       if (!mainImage) {
@@ -344,8 +355,6 @@ export default function MyNextFastAPIApp() {
       }
       if (overrideTitle != null) setTitleDraft(overrideTitle);
       setLensError("");
-      setLensSelectionCollapsed(true);
-      setLensPanelCollapsed(true);
       setStep("analyzing");
     }
 
@@ -368,12 +377,6 @@ export default function MyNextFastAPIApp() {
     handleRun(chosenTitle);
   }
 
-  function handleLensEditChoice() {
-    setLensSelectionCollapsed(false);
-    setLensPanelCollapsed(false);
-    setTitleDraft(lensTitleDraft);
-  }
-
   const uiBusy = anyBusy || lensLoading;
   const showResultsPanel = screen === "results";
   return (
@@ -387,7 +390,7 @@ export default function MyNextFastAPIApp() {
                 <button
                   type="button"
                   onClick={() => setScreen("guided")}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/10"
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
                 >
                   <svg
                     aria-hidden="true"
@@ -410,7 +413,7 @@ export default function MyNextFastAPIApp() {
               ) : null}
               <div>
                 <div className="text-[10px] uppercase tracking-[0.3em] text-muted">Workflow</div>
-                <div className="mt-1 text-sm font-semibold text-white">
+                <div className="mt-1 text-sm font-semibold text-[var(--foreground)]">
                   {screen === "guided" ? "Guided match selection" : "Market listings"}
                 </div>
               </div>
@@ -419,23 +422,23 @@ export default function MyNextFastAPIApp() {
               <button
                 type="button"
                 onClick={handleNewSearch}
-                className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-900 transition hover:bg-white/90"
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-semibold text-[#f9f1e2] transition hover:bg-[var(--accent-strong)]"
               >
                 New search
               </button>
               <button
                 type="button"
                 onClick={handleEditInputs}
-                className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/10 sm:inline-flex"
+                className="hidden items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)] sm:inline-flex"
               >
                 Edit inputs
               </button>
               <details className="relative sm:hidden">
-                <summary className="list-none rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/10">
+                <summary className="list-none rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]">
                   <span aria-hidden="true">...</span>
                   <span className="sr-only">More actions</span>
                 </summary>
-                <div className="absolute right-0 z-10 mt-2 w-40 rounded-xl border border-white/10 bg-slate-950/95 p-1 text-[11px] text-white shadow-lg">
+                <div className="absolute right-0 z-10 mt-2 w-40 rounded-xl border border-white/10 bg-[var(--panel)] p-1 text-[11px] text-[var(--foreground)] shadow-lg">
                   <button
                     type="button"
                     onClick={handleEditInputs}
@@ -493,15 +496,11 @@ export default function MyNextFastAPIApp() {
             error={lensError}
             step={step}
             isEditingTitle={isEditingTitle}
-            isSelectionCollapsed={lensSelectionCollapsed}
-            isPanelCollapsed={lensPanelCollapsed}
             mainPreview={mainPreview}
             onSelect={selectLensCandidate}
             onTitleChange={updateLensTitle}
             onToggleEdit={() => setIsEditingTitle((prev) => !prev)}
             onRunAnalysis={handleLensRunAnalysis}
-            onEditSelection={handleLensEditChoice}
-            onTogglePanel={() => setLensPanelCollapsed((prev) => !prev)}
             onPrev={() => setLensPage((p) => Math.max(0, p - 1))}
             onNext={() =>
               setLensPage((p) => {

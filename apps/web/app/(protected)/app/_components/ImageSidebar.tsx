@@ -22,13 +22,13 @@ export function ImageSidebar({
   return (
     <div className="sticky top-24 self-start">
       {!mainPreview && extraPreviews.length === 0 ? (
-        <div className="text-sm text-slate-500">No images selected yet.</div>
+        <div className="text-sm text-[var(--muted)]">No images selected yet.</div>
       ) : (
         <div className="space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Main Image</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">{mainPreview ? 1 : 0}</div>
+              <div className="text-xs font-semibold text-[var(--foreground)]">Main Image</div>
+              <div className="text-xs text-[var(--muted)]">{mainPreview ? 1 : 0}</div>
             </div>
 
             {mainPreview ? (
@@ -38,15 +38,15 @@ export function ImageSidebar({
                 onRemove={onRemoveMain}
               />
             ) : (
-              <div className="text-xs text-slate-500 dark:text-slate-400">No main image selected.</div>
+              <div className="text-xs text-[var(--muted)]">No main image selected.</div>
             )}
           </div>
 
           {showExtras && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Extra Images</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">{extraPreviews.length}</div>
+                <div className="text-xs font-semibold text-[var(--foreground)]">Extra Images</div>
+                <div className="text-xs text-[var(--muted)]">{extraPreviews.length}</div>
               </div>
 
               {extraPreviews.length ? (
@@ -61,7 +61,7 @@ export function ImageSidebar({
                   ))}
                 </div>
               ) : (
-                <div className="text-xs text-slate-500 dark:text-slate-400">No extra images selected.</div>
+                <div className="text-xs text-[var(--muted)]">No extra images selected.</div>
               )}
             </div>
           )}
