@@ -208,7 +208,7 @@ export function LensGuidedPanel({
                           "interactive-step group relative flex min-h-[clamp(12rem,26vh,16rem)] h-full flex-col overflow-hidden rounded-2xl border text-left cursor-pointer",
                           "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(127,98,74,0.45)] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(236,219,194,0.98)]",
                           isSelected
-                            ? "interactive-step-selected border-[var(--panel-border)] bg-[var(--panel-quiet)]/70 opacity-100"
+                            ? "interactive-step-selected border-[3px] border-[rgba(127,98,74,0.74)] bg-[var(--panel-quiet)]/70 opacity-100"
                             : "border-[var(--panel-border)] bg-[var(--panel-quiet)]/70 opacity-[0.85]",
                           controlsDisabled ? "cursor-not-allowed opacity-70" : "",
                         ].join(" ")}
@@ -224,7 +224,7 @@ export function LensGuidedPanel({
                             </div>
                           ) : null}
                           {isSelected ? (
-                            <span className="absolute right-2 top-2 rounded-full border border-[rgba(111,85,64,0.65)] bg-[rgba(241,229,208,0.95)] px-2.5 py-1 text-[10px] font-semibold text-[rgba(93,67,49,0.98)]">
+                            <span className="absolute right-2 top-2 rounded-full border border-[rgba(84,128,84,0.62)] bg-[rgba(208,234,206,0.96)] px-2.5 py-1 text-[10px] font-semibold text-[rgba(46,92,46,0.98)] shadow-[0_2px_8px_rgba(70,108,70,0.2)]">
                               Selected ✓
                             </span>
                           ) : null}
@@ -233,7 +233,14 @@ export function LensGuidedPanel({
                         <div className="space-y-2 p-3">
                           <div className="truncate text-sm font-semibold text-[var(--foreground)]">{stripTrailingEllipsis(item.title) || "Lens result"}</div>
                           <div className="flex items-center justify-between">
-                            <span className="rounded-full border border-[rgba(126,99,75,0.4)] bg-[rgba(237,223,201,0.88)] px-2.5 py-1 text-[10px] font-semibold text-[rgba(95,70,52,0.96)]">
+                            <span
+                              className={[
+                                "rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                                isSelected
+                                  ? "border border-[rgba(84,128,84,0.62)] bg-[rgba(208,234,206,0.96)] text-[rgba(46,92,46,0.98)]"
+                                  : "border border-[rgba(126,99,75,0.4)] bg-[rgba(237,223,201,0.88)] text-[rgba(95,70,52,0.96)]",
+                              ].join(" ")}
+                            >
                               {isSelected ? "Selected ✓" : "Select this match"}
                             </span>
                             {!isSelected ? <span className="text-[10px] text-[var(--muted)]">Tap to select</span> : null}
