@@ -35,8 +35,6 @@ export default function MyNextFastAPIApp() {
   const [step, setStep] = useState<FlowStep>("inputs");
   const [runActive, setRunActive] = useState(true);
   const [runSold, setRunSold] = useState(false);
-  const [collapseForm, setCollapseForm] = useState(false);
-  const [hasRunOnce, setHasRunOnce] = useState(false);
   const [lensCandidates, setLensCandidates] = useState<LensCandidate[]>([]);
   const [lensLoading, setLensLoading] = useState(false);
   const [lensError, setLensError] = useState("");
@@ -131,8 +129,6 @@ export default function MyNextFastAPIApp() {
     setIdentifyMode(null);
     setItemName("");
     setTextInput("");
-    setHasRunOnce(false);
-    setCollapseForm(false);
     setSubmitAttempted(false);
     setStep("inputs");
     setScreen("inputs");
@@ -202,8 +198,8 @@ export default function MyNextFastAPIApp() {
       setIsEditingTitle(false);
       setStep(candidates.length ? "pick_match" : "inputs");
       setScreen(candidates.length ? "guided" : "inputs");
-    } catch (e: any) {
-      setLensError(e?.message ?? "Failed to load Google Lens results.");
+    } catch (e: unknown) {
+      setLensError(e instanceof Error ? e.message : "Failed to load Google Lens results.");
     } finally {
       setLensLoading(false);
     }
@@ -259,8 +255,6 @@ export default function MyNextFastAPIApp() {
     setTextInput("");
     setItemName("");
     setSubmitAttempted(false);
-    setHasRunOnce(false);
-    setCollapseForm(false);
     setRunActive(true);
     setRunSold(false);
     setIdentifyMode(null);
@@ -278,8 +272,6 @@ export default function MyNextFastAPIApp() {
   }
 
   async function runAnalysis(mode: Mode) {
-    setHasRunOnce(true);
-    setCollapseForm(true);
     setScreen("results");
 
     abortAll();
@@ -310,7 +302,6 @@ export default function MyNextFastAPIApp() {
 
     if (!identifyMode) {
       setSubmitAttempted(true);
-      setCollapseForm(false);
       setScreen("inputs");
       return;
     }
@@ -318,7 +309,6 @@ export default function MyNextFastAPIApp() {
     if (identifyMode === "lens" && !lensCandidates.length && !lensLoading) {
       setLensError("");
       if (!mainImage) {
-        setCollapseForm(false);
         setSubmitAttempted(true);
         setLensError("Upload a main image to generate name suggestions.");
         setStep("inputs");
@@ -331,7 +321,6 @@ export default function MyNextFastAPIApp() {
     }
 
     if (!mainImage) {
-      setCollapseForm(false);
       setSubmitAttempted(true);
       setScreen("results");
       await runMode(mode);
@@ -357,9 +346,6 @@ export default function MyNextFastAPIApp() {
       setLensError("");
       setStep("analyzing");
     }
-
-    setHasRunOnce(true);
-    setCollapseForm(true);
 
     await runAnalysis(mode);
 
@@ -454,9 +440,6 @@ export default function MyNextFastAPIApp() {
 
         {screen === "inputs" && (
           <SearchFormCard
-            hasRunOnce={hasRunOnce}
-            collapseForm={collapseForm}
-            setCollapseForm={setCollapseForm}
             anyBusy={uiBusy}
             submitAttempted={submitAttempted}
             identifyMode={identifyMode}

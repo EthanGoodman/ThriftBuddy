@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import { listingKey } from "@/lib/thrift/listing";
 import { fmtMoney } from "@/lib/thrift/format";
 import { ListingRemoveX } from "@/components/ListingRemove";
@@ -18,6 +20,16 @@ export function ExampleListingsList({
   variant?: "active" | "sold";
   maxItems?: number;
 }) {
+  const [removingKeys, setRemovingKeys] = useState<Set<string>>(new Set());
+  const removeTimersRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(removeTimersRef.current).forEach((id) => window.clearTimeout(id));
+      removeTimersRef.current = {};
+    };
+  }, []);
+
   const items = listings
     .map((it, idx) => ({ it, idx, key: listingKey(it, idx) }))
     .filter(({ it }) => it.price?.extracted != null)
@@ -47,14 +59,31 @@ export function ExampleListingsList({
             href={it.link || "#"}
             target="_blank"
             rel="noreferrer"
-            className="group relative overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-quiet)]/72 transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_76%,white)]"
+            className={[
+              "group relative overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-quiet)]/72 transition-all duration-200",
+              "hover:bg-[color-mix(in_srgb,var(--panel-quiet)_76%,white)]",
+              removingKeys.has(key) ? "pointer-events-none scale-[0.98] opacity-0" : "opacity-100",
+            ].join(" ")}
           >
             <ListingRemoveX
-              ariaLabel="Remove listing"
+              ariaLabel="Remove from results"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                onDismiss(key);
+                setRemovingKeys((prev) => {
+                  const next = new Set(prev);
+                  next.add(key);
+                  return next;
+                });
+                removeTimersRef.current[key] = window.setTimeout(() => {
+                  onDismiss(key);
+                  setRemovingKeys((prev) => {
+                    const next = new Set(prev);
+                    next.delete(key);
+                    return next;
+                  });
+                  delete removeTimersRef.current[key];
+                }, 180);
               }}
             />
 
@@ -77,12 +106,12 @@ export function ExampleListingsList({
               </span>
             </div>
 
-            <div className="space-y-2 p-4">
-              <div className="text-sm font-semibold text-[var(--foreground)] line-clamp-2">
+            <div className="space-y-2 border-t border-[rgba(126,99,75,0.28)] bg-[rgba(247,238,223,0.96)] p-4">
+              <div className="text-[15px] font-semibold leading-snug text-[rgba(54,38,27,0.98)] line-clamp-2">
                 {it.title || "Untitled listing"}
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted">
-                <span className="font-semibold text-[var(--accent)]">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[rgba(98,73,54,0.92)]">
+                <span className="font-semibold text-[rgba(111,68,45,0.98)]">
                   {it.price?.extracted != null ? fmtMoney(it.price.extracted) : it.price?.raw ?? "-"}
                 </span>
                 {it.condition ? <span>{it.condition}</span> : null}

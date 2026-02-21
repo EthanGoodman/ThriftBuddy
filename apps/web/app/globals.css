@@ -506,8 +506,8 @@ body {
 @media (min-width: 920px) {
   .step-tabs-desktop {
     display: grid;
-    grid-template-columns: minmax(17.5rem, 20rem) minmax(0, 1fr);
-    gap: clamp(1.25rem, 2.3vw, 1.9rem);
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(0.9rem, 1.8vw, 1.3rem);
     align-items: start;
   }
 
@@ -515,18 +515,20 @@ body {
     display: none;
   }
 
-  .step-tabs__rail {
+  .step-tabs__top {
     display: grid;
-    gap: 0.75rem;
-    padding-right: 0.5rem;
-    border-right: 1px solid rgba(132, 154, 214, 0.16);
-    margin-right: 0;
+    gap: 0.7rem;
     min-width: 0;
   }
 
   .step-tabs__list {
     display: grid;
     gap: 0.72rem;
+  }
+
+  .step-tabs__list--horizontal {
+    grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr));
+    align-items: stretch;
   }
 
   .step-tab {
@@ -1463,6 +1465,15 @@ body {
   background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 38%, rgba(39, 26, 17, 0.24) 100%);
 }
 
+.site-canvas-bg {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(205, 170, 133, 0.34), transparent 55%),
+    radial-gradient(80% 90% at 100% 10%, rgba(174, 124, 89, 0.28), transparent 58%),
+    radial-gradient(70% 60% at 20% 25%, rgba(255, 240, 213, 0.34), transparent 62%),
+    radial-gradient(65% 55% at 80% 78%, rgba(119, 79, 53, 0.2), transparent 72%),
+    linear-gradient(145deg, #d8c4a5 0%, #cfb38f 45%, #c59e75 100%);
+}
+
 .vintage-landing {
   position: relative;
   isolation: isolate;
@@ -1505,7 +1516,6 @@ body {
   background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(42, 29, 20, 0.24) 100%);
 }
 
-.upload-panel,
 .upload-drop,
 .upload-preview,
 .step-tabs__panel,
@@ -1519,7 +1529,6 @@ body {
   border-color: var(--panel-border);
 }
 
-.upload-panel,
 .upload-drop,
 .upload-preview,
 .step-tabs__panel,
@@ -1759,6 +1768,59 @@ textarea::placeholder {
   color: rgba(110, 83, 62, 0.96);
 }
 
+/* Plan cards: match step-tab hover + selected behavior */
+.plan-method-card {
+  border-color: var(--panel-border);
+  background: var(--panel-quiet);
+  box-shadow: 0 8px 20px rgba(76, 55, 38, 0.14);
+}
+
+.plan-method-card.is-recommended:not(.is-active) {
+  border-color: var(--panel-border);
+  background: var(--panel-quiet);
+  box-shadow: 0 8px 20px rgba(76, 55, 38, 0.14);
+  transform: none;
+}
+
+.plan-method-card.is-recommended:not(.is-active):hover {
+  border-color: rgba(127, 98, 74, 0.52);
+  background: linear-gradient(180deg, rgba(235, 217, 190, 0.92), rgba(222, 199, 168, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(132, 100, 75, 0.22);
+}
+
+.plan-method-card__recommended {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid rgba(92, 66, 47, 0.75);
+  background: rgba(96, 67, 47, 0.96);
+  color: #f8ecda;
+  padding: 0.24rem 0.64rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+  box-shadow: 0 6px 12px rgba(70, 49, 35, 0.22);
+}
+
+.plan-method-card:hover {
+  border-color: rgba(127, 98, 74, 0.52);
+  background: linear-gradient(180deg, rgba(235, 217, 190, 0.92), rgba(222, 199, 168, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(132, 100, 75, 0.22);
+}
+
+.plan-method-card.is-active {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--panel-border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel-quiet));
+  box-shadow: 0 10px 24px rgba(86, 58, 40, 0.22);
+  transform: none;
+}
+
 .mode-segment-inactive:hover {
   border-color: rgba(127, 98, 74, 0.62);
   background: linear-gradient(180deg, rgba(238, 222, 198, 0.96), rgba(226, 205, 176, 0.94));
@@ -1797,15 +1859,52 @@ textarea::placeholder {
   box-shadow: 0 10px 24px rgba(86, 58, 40, 0.22);
 }
 
+.upload-panel {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
 .upload-preview {
-  background:
-    radial-gradient(120% 130% at 20% 10%, rgba(255, 243, 223, 0.62), transparent 58%),
-    linear-gradient(160deg, rgba(223, 202, 175, 0.96), rgba(200, 176, 148, 0.96));
-  border: 1px solid rgba(121, 95, 73, 0.36);
+  background: rgba(238, 219, 192, 0.5);
+  border: 1px solid rgba(121, 95, 73, 0.32);
+  box-shadow: none;
+  border-radius: 1rem;
 }
 
 .upload-preview-image {
   background: transparent;
+}
+
+.upload-preview-drop {
+  position: relative;
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+  transition: outline-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.upload-preview-drop.is-drag-active,
+.upload-preview-drop[data-drag-active="true"] {
+  outline: 2px dashed rgba(143, 90, 58, 0.58);
+  outline-offset: -6px;
+  background: rgba(238, 218, 192, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 247, 233, 0.52), 0 10px 20px rgba(74, 54, 39, 0.16);
+}
+
+.upload-preview-drop__overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(52, 36, 24, 0.18);
+  color: #f8ecda;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .matches-loading {
@@ -1870,4 +1969,48 @@ textarea::placeholder {
     transparent
   );
   mix-blend-mode: normal;
+}
+
+.matches-skeleton-block {
+  position: relative;
+  overflow: hidden;
+}
+
+.matches-skeleton-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 244, 228, 0.52), transparent);
+  transform: translateX(-120%);
+  animation: shimmerSweep 1.9s ease-in-out infinite;
+  mix-blend-mode: normal;
+}
+
+.listing-remove-btn {
+  position: absolute;
+}
+
+.listing-remove-btn:hover .listing-remove-label,
+.listing-remove-btn:focus-visible .listing-remove-label {
+  width: 3.7rem;
+  opacity: 1;
+}
+
+/* Search flow cleanup: remove legacy top accent/divider line */
+.step-tabs__panel::before {
+  display: none;
+}
+
+.step-tabs__panel-header {
+  border-bottom: none;
+}
+
+.step-tabs-mobile__panel {
+  border-top: none;
+}
+
+@media (hover: hover) {
+  .listing-remove-btn::after {
+    content: none;
+  }
 }

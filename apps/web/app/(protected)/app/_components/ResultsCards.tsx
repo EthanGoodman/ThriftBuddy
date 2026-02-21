@@ -61,16 +61,19 @@ function useAnimatedNumber(target: number | null, durationMs = 180) {
       rafRef.current = null;
     }
 
+    const commitDisplay = (value: number | null) => {
+      displayRef.current = value;
+      setDisplay(value);
+    };
+
     if (target == null) {
-      displayRef.current = target;
-      setDisplay(target);
+      rafRef.current = requestAnimationFrame(() => commitDisplay(target));
       return;
     }
 
     const startValue = displayRef.current ?? target;
     if (startValue === target) {
-      displayRef.current = target;
-      setDisplay(target);
+      rafRef.current = requestAnimationFrame(() => commitDisplay(target));
       return;
     }
 
@@ -78,8 +81,7 @@ function useAnimatedNumber(target: number | null, durationMs = 180) {
     const step = (now: number) => {
       const t = Math.min(1, (now - startTime) / durationMs);
       const next = startValue + (target - startValue) * t;
-      displayRef.current = next;
-      setDisplay(next);
+      commitDisplay(next);
       if (t < 1) {
         rafRef.current = requestAnimationFrame(step);
       }
@@ -108,8 +110,6 @@ export function ResultsCards({
   onDismissActive,
   onDismissSold,
 }: ResultsCardsProps) {
-  const [soldExpanded, setSoldExpanded] = useState(false);
-  const [activeExpanded, setActiveExpanded] = useState(false);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [isCondensed, setIsCondensed] = useState(false);
@@ -180,7 +180,7 @@ export function ResultsCards({
         className={[
           "sticky top-0 z-30 transition-all duration-300",
           isCondensed
-            ? "rounded-none bg-[var(--panel)]/90 p-3 shadow-[0_18px_50px_rgba(67,47,31,0.22)] backdrop-blur-xl"
+            ? "rounded-none bg-transparent p-3 shadow-none"
             : "bg-transparent",
         ].join(" ")}
       >
@@ -327,13 +327,6 @@ export function ResultsCards({
             {soldCount} items
           </span>
           </div>
-          <button
-            type="button"
-            onClick={() => setSoldExpanded((prev) => !prev)}
-            className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
-          >
-            {soldExpanded ? "Collapse" : "Expand"}
-          </button>
         </div>
         {soldData?.sold_listings?.length ? (
           <ExampleListingsList
@@ -342,7 +335,6 @@ export function ResultsCards({
             dismissedKeys={dismissedSold}
             onDismiss={onDismissSold}
             variant="sold"
-            maxItems={soldExpanded ? undefined : 3}
           />
         ) : (
           <div className="rounded-2xl panel-strong p-4 text-sm text-muted">
@@ -359,13 +351,6 @@ export function ResultsCards({
             {activeCount} items
           </span>
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveExpanded((prev) => !prev)}
-            className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
-          >
-            {activeExpanded ? "Collapse" : "Expand"}
-          </button>
         </div>
         {activeData?.active_listings?.length ? (
           <ExampleListingsList
@@ -374,7 +359,6 @@ export function ResultsCards({
             dismissedKeys={dismissedActive}
             onDismiss={onDismissActive}
             variant="active"
-            maxItems={activeExpanded ? undefined : 3}
           />
         ) : (
           <div className="rounded-2xl panel-strong p-4 text-sm text-muted">
