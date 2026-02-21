@@ -371,14 +371,6 @@ export function LensGuidedPanel({
           )}
         </section>
       </div>
-
-      <div className="rounded-2xl panel-strong p-4 text-xs text-[var(--muted)]">
-        <div className="font-semibold text-[var(--foreground)]">Why confirm?</div>
-        <p className="mt-1">
-          AI image recognition is not perfect. By confirming the match, you ensure we search for the exact product
-          you are researching, leading to more accurate marketplace results.
-        </p>
-      </div>
     </div>
   );
 }

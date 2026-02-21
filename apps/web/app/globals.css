@@ -343,7 +343,7 @@ body {
 .step-tab.is-active .step-tab__title,
 .step-tabs-mobile__tab.is-active .step-tab__title {
   font-weight: 760;
-  color: #f4f8ff;
+  color: var(--foreground);
 }
 
 .step-tab__right {
