@@ -338,7 +338,7 @@ export function LensGuidedPanel({
                       ) : !hasSelection ? (
                         "Select a match to continue"
                       ) : (
-                        "Run analysis with this selection"
+                        "Search with this title"
                       )}
                     </button>
 

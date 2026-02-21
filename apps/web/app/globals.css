@@ -1990,12 +1990,6 @@ textarea::placeholder {
   position: absolute;
 }
 
-.listing-remove-btn:hover .listing-remove-label,
-.listing-remove-btn:focus-visible .listing-remove-label {
-  width: 3.7rem;
-  opacity: 1;
-}
-
 /* Search flow cleanup: remove legacy top accent/divider line */
 .step-tabs__panel::before {
   display: none;

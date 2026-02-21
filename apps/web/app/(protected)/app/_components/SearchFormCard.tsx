@@ -540,11 +540,6 @@ export function SearchFormCard({
                         >
                           + Add photos
                         </label>
-                        {extrasSelected ? (
-                          <span className="text-caption text-[var(--muted)]">{extraPreviews.length} added</span>
-                        ) : (
-                          <span className="text-caption text-[var(--muted)]">Angles help with variants.</span>
-                        )}
                         <input
                           id="extra-image-upload"
                           type="file"
@@ -639,8 +634,8 @@ export function SearchFormCard({
     return (
       <div className="mode-panel scrollbar-clean">
         <div className="flex flex-wrap items-center gap-3">
-          <CheckboxChip checked={runActive} onChange={setRunActive} disabled={anyBusy} label="Active listings" />
           <CheckboxChip checked={runSold} onChange={setRunSold} disabled={anyBusy} label="Sold listings" />
+          <CheckboxChip checked={runActive} onChange={setRunActive} disabled={anyBusy} label="Active listings" />
         </div>
 
         <div className="mode-divider" />

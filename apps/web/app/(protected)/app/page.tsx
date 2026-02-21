@@ -34,7 +34,7 @@ export default function MyNextFastAPIApp() {
   const [identifyMode, setIdentifyMode] = useState<IdentifyMode>(null);
   const [step, setStep] = useState<FlowStep>("inputs");
   const [runActive, setRunActive] = useState(true);
-  const [runSold, setRunSold] = useState(false);
+  const [runSold, setRunSold] = useState(true);
   const [lensCandidates, setLensCandidates] = useState<LensCandidate[]>([]);
   const [lensLoading, setLensLoading] = useState(false);
   const [lensError, setLensError] = useState("");
@@ -256,7 +256,7 @@ export default function MyNextFastAPIApp() {
     setItemName("");
     setSubmitAttempted(false);
     setRunActive(true);
-    setRunSold(false);
+    setRunSold(true);
     setIdentifyMode(null);
     resetLensState();
     setScreen("inputs");
@@ -523,12 +523,6 @@ export default function MyNextFastAPIApp() {
             onDismissSold={dismissSold}
           />
         )}
-
-        {screen === "inputs" ? (
-          <div className="text-center text-caption text-muted">
-            Your image is analyzed privately and securely.
-          </div>
-        ) : null}
       </div>
 
     </div>

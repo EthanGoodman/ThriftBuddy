@@ -110,6 +110,8 @@ export function ResultsCards({
   onDismissActive,
   onDismissSold,
 }: ResultsCardsProps) {
+  const [soldExpanded, setSoldExpanded] = useState(false);
+  const [activeExpanded, setActiveExpanded] = useState(false);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [isCondensed, setIsCondensed] = useState(false);
@@ -329,13 +331,25 @@ export function ResultsCards({
           </div>
         </div>
         {soldData?.sold_listings?.length ? (
-          <ExampleListingsList
-            listings={soldData.sold_listings}
-            fullscreen
-            dismissedKeys={dismissedSold}
-            onDismiss={onDismissSold}
-            variant="sold"
-          />
+          <>
+            <ExampleListingsList
+              listings={soldData.sold_listings}
+              fullscreen
+              dismissedKeys={dismissedSold}
+              onDismiss={onDismissSold}
+              variant="sold"
+              maxItems={soldExpanded ? undefined : 3}
+            />
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setSoldExpanded((prev) => !prev)}
+                className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
+              >
+                {soldExpanded ? "Collapse sold" : "Expand sold"}
+              </button>
+            </div>
+          </>
         ) : (
           <div className="rounded-2xl panel-strong p-4 text-sm text-muted">
             {soldLoading ? "Loading sold listings..." : "Run Sold to see examples."}
@@ -353,13 +367,25 @@ export function ResultsCards({
           </div>
         </div>
         {activeData?.active_listings?.length ? (
-          <ExampleListingsList
-            listings={activeData.active_listings}
-            fullscreen
-            dismissedKeys={dismissedActive}
-            onDismiss={onDismissActive}
-            variant="active"
-          />
+          <>
+            <ExampleListingsList
+              listings={activeData.active_listings}
+              fullscreen
+              dismissedKeys={dismissedActive}
+              onDismiss={onDismissActive}
+              variant="active"
+              maxItems={activeExpanded ? undefined : 3}
+            />
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setActiveExpanded((prev) => !prev)}
+                className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
+              >
+                {activeExpanded ? "Collapse active" : "Expand active"}
+              </button>
+            </div>
+          </>
         ) : (
           <div className="rounded-2xl panel-strong p-4 text-sm text-muted">
             {activeLoading ? "Loading active listings..." : "Run Active to see examples."}
