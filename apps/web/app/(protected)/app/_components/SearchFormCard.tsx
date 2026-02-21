@@ -733,7 +733,6 @@ export function SearchFormCard({
                       <StepIcon step={activeStepDef.id} />
                     </span>
                     <div>
-                      <div className="step-tabs__panel-kicker">Focused workspace</div>
                       <div className="step-tabs__panel-title">{activeStepDef.title}</div>
                     </div>
                   </div>
