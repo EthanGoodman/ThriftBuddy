@@ -16,12 +16,12 @@ type LensGuidedPanelProps = {
   isEditingTitle: boolean;
   mainPreview?: Preview;
   onSelect: (candidate: LensCandidate) => void;
+  onDeselect: () => void;
   onTitleChange: (value: string) => void;
   onToggleEdit: () => void;
   onRunAnalysis: () => void;
   onPrev: () => void;
   onNext: () => void;
-  onReset: () => void;
 };
 
 function stripTrailingEllipsis(value: string) {
@@ -40,12 +40,12 @@ export function LensGuidedPanel({
   isEditingTitle,
   mainPreview,
   onSelect,
+  onDeselect,
   onTitleChange,
   onToggleEdit,
   onRunAnalysis,
   onPrev,
   onNext,
-  onReset,
 }: LensGuidedPanelProps) {
   const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
   const selectionModuleRef = useRef<HTMLDivElement | null>(null);
@@ -169,6 +169,10 @@ export function LensGuidedPanel({
                         tabIndex={0}
                         onClick={() => {
                           if (controlsDisabled) return;
+                          if (isSelected) {
+                            onDeselect();
+                            return;
+                          }
                           onSelect(item);
                         }}
                         onKeyDown={(e) => {
@@ -192,15 +196,20 @@ export function LensGuidedPanel({
                           }
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            if (!controlsDisabled) onSelect(item);
+                            if (controlsDisabled) return;
+                            if (isSelected) {
+                              onDeselect();
+                              return;
+                            }
+                            onSelect(item);
                           }
                         }}
                         className={[
-                          "group relative flex min-h-[clamp(12rem,26vh,16rem)] h-full flex-col overflow-hidden rounded-2xl border text-left cursor-pointer transition-all duration-200",
+                          "interactive-step group relative flex min-h-[clamp(12rem,26vh,16rem)] h-full flex-col overflow-hidden rounded-2xl border text-left cursor-pointer",
                           "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(127,98,74,0.45)] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(236,219,194,0.98)]",
                           isSelected
-                            ? "border-[3px] border-[rgba(127,98,74,0.74)] bg-[rgba(143,90,58,0.08)] shadow-[0_0_0_3px_rgba(127,98,74,0.16),0_10px_24px_rgba(74,54,39,0.2)] opacity-100"
-                            : "border-[var(--panel-border)] bg-[var(--panel-quiet)]/70 opacity-[0.85] hover:translate-y-[-2px] hover:opacity-100 hover:border-[rgba(127,98,74,0.55)] hover:shadow-[0_8px_20px_rgba(74,54,39,0.18)]",
+                            ? "interactive-step-selected border-[var(--panel-border)] bg-[var(--panel-quiet)]/70 opacity-100"
+                            : "border-[var(--panel-border)] bg-[var(--panel-quiet)]/70 opacity-[0.85]",
                           controlsDisabled ? "cursor-not-allowed opacity-70" : "",
                         ].join(" ")}
                         >
@@ -236,33 +245,41 @@ export function LensGuidedPanel({
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)]/75 px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={onPrev}
-                    disabled={pageIndex === 0 || controlsDisabled}
-                    className={[
-                      "rounded-full px-3 py-1.5 text-xs font-semibold border transition",
-                      pageIndex === 0 || controlsDisabled
-                        ? "bg-[var(--panel-quiet)] text-[var(--muted)] cursor-not-allowed border-[var(--panel-border)]/40"
-                        : "bg-[var(--panel-quiet)] text-[var(--foreground)] border-[var(--panel-border)] hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]",
-                    ].join(" ")}
-                  >
-                    Prev
-                  </button>
+                  {pageIndex > 0 ? (
+                    <button
+                      type="button"
+                      onClick={onPrev}
+                      disabled={controlsDisabled}
+                      className={[
+                        "interactive-step rounded-full px-3 py-1.5 text-xs font-semibold border",
+                        controlsDisabled
+                          ? "bg-[var(--panel-quiet)] text-[var(--muted)] cursor-not-allowed border-[var(--panel-border)]/40"
+                          : "bg-[var(--panel-quiet)] text-[var(--foreground)] border-[var(--panel-border)]",
+                      ].join(" ")}
+                    >
+                      Prev
+                    </button>
+                  ) : (
+                    <span />
+                  )}
                   <div className="text-xs text-[var(--muted)]">Page {pageIndex + 1} of {pageCount}</div>
-                  <button
-                    type="button"
-                    onClick={onNext}
-                    disabled={pageIndex >= pageCount - 1 || controlsDisabled}
-                    className={[
-                      "rounded-full px-3 py-1.5 text-xs font-semibold border transition",
-                      pageIndex >= pageCount - 1 || controlsDisabled
-                        ? "bg-[var(--panel-quiet)] text-[var(--muted)] cursor-not-allowed border-[var(--panel-border)]/40"
-                        : "bg-[var(--panel-quiet)] text-[var(--foreground)] border-[var(--panel-border)] hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]",
-                    ].join(" ")}
-                  >
-                    Next
-                  </button>
+                  {pageIndex < pageCount - 1 ? (
+                    <button
+                      type="button"
+                      onClick={onNext}
+                      disabled={controlsDisabled}
+                      className={[
+                        "interactive-step rounded-full px-3 py-1.5 text-xs font-semibold border",
+                        controlsDisabled
+                          ? "bg-[var(--panel-quiet)] text-[var(--muted)] cursor-not-allowed border-[var(--panel-border)]/40"
+                          : "bg-[var(--panel-quiet)] text-[var(--foreground)] border-[var(--panel-border)]",
+                      ].join(" ")}
+                    >
+                      Next
+                    </button>
+                  ) : (
+                    <span />
+                  )}
                 </div>
               </div>
 
@@ -282,13 +299,23 @@ export function LensGuidedPanel({
                     <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Selected result</div>
                     <div className="mt-1 text-xs text-[var(--muted)]">Refine title, then run.</div>
                   </div>
-                  <div className="flex items-center gap-3 pb-2 border-b border-[rgba(129,101,78,0.34)]">
-                    <div className="h-14 w-14 overflow-hidden rounded-lg bg-[var(--panel)]">
-                      <img src={selectedCandidate?.image} alt={selectedCandidate?.title || "Selected item"} className="h-full w-full object-cover" />
+                  <div className="flex items-center justify-between gap-3 pb-2 border-b border-[rgba(129,101,78,0.34)]">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="h-14 w-14 overflow-hidden rounded-lg bg-[var(--panel)]">
+                        <img src={selectedCandidate?.image} alt={selectedCandidate?.title || "Selected item"} className="h-full w-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-[var(--foreground)]">{selectedCandidate?.title || "Selected item"}</div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[var(--foreground)]">{selectedCandidate?.title || "Selected item"}</div>
-                    </div>
+                    <button
+                      type="button"
+                      disabled={!hasSelection || !originalTitle || controlsDisabled}
+                      onClick={() => onTitleChange(originalTitle)}
+                      className="interactive-step shrink-0 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Use original title
+                    </button>
                   </div>
 
                   <div>
@@ -341,25 +368,6 @@ export function LensGuidedPanel({
                         "Search with this title"
                       )}
                     </button>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={!hasSelection || !originalTitle || controlsDisabled}
-                        onClick={() => onTitleChange(originalTitle)}
-                        className="flex-1 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[color-mix(in_srgb,var(--panel)_80%,white)]"
-                      >
-                        Use original title
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!hasSelection || controlsDisabled}
-                        onClick={onReset}
-                        className="flex-1 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[color-mix(in_srgb,var(--panel)_80%,white)]"
-                      >
-                        Reset
-                      </button>
-                    </div>
 
                     {titleUpdated ? <div className="text-[11px] font-semibold text-[var(--success)]">Title updated ✓</div> : null}
                     <div className="text-[11px] text-[var(--muted)]">Next: we&apos;ll search marketplaces using your refined title.</div>

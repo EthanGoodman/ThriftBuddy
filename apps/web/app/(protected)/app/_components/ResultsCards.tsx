@@ -344,9 +344,17 @@ export function ResultsCards({
               <button
                 type="button"
                 onClick={() => setSoldExpanded((prev) => !prev)}
-                className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
+                className={[
+                  "interactive-step inline-flex min-h-10 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold",
+                  "border-[rgba(95,121,84,0.5)] bg-[rgba(223,214,193,0.92)] text-[rgba(56,78,50,0.98)]",
+                  "shadow-[0_6px_14px_rgba(74,54,39,0.14)] cursor-pointer",
+                  "hover:translate-y-[-1px]",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(95,121,84,0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(236,219,194,0.98)]",
+                  "active:translate-y-[1px] active:shadow-[0_2px_8px_rgba(74,54,39,0.18)]",
+                ].join(" ")}
               >
-                {soldExpanded ? "Collapse sold" : "Expand sold"}
+                <span aria-hidden="true" className="text-sm leading-none">{soldExpanded ? "▴" : "▾"}</span>
+                <span>{soldExpanded ? "Collapse sold results" : "Expand sold results"}</span>
               </button>
             </div>
           </>
@@ -380,9 +388,17 @@ export function ResultsCards({
               <button
                 type="button"
                 onClick={() => setActiveExpanded((prev) => !prev)}
-                className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
+                className={[
+                  "interactive-step inline-flex min-h-10 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold",
+                  "border-[rgba(127,98,74,0.58)] bg-[rgba(232,219,198,0.94)] text-[rgba(95,70,52,0.98)]",
+                  "shadow-[0_6px_14px_rgba(74,54,39,0.14)] cursor-pointer",
+                  "hover:translate-y-[-1px]",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(127,98,74,0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(236,219,194,0.98)]",
+                  "active:translate-y-[1px] active:shadow-[0_2px_8px_rgba(74,54,39,0.18)]",
+                ].join(" ")}
               >
-                {activeExpanded ? "Collapse active" : "Expand active"}
+                <span aria-hidden="true" className="text-sm leading-none">{activeExpanded ? "▴" : "▾"}</span>
+                <span>{activeExpanded ? "Collapse active listings" : "Expand active listings"}</span>
               </button>
             </div>
           </>

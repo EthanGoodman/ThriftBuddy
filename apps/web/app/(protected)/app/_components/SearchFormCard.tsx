@@ -45,31 +45,6 @@ type StepDef = {
   disabled: boolean;
 };
 
-function StepIcon({ step }: { step: FormSectionKey }) {
-  if (step === "upload") {
-    return (
-      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="step-tab__icon-svg">
-        <path d="M8 10V4M8 4L5.5 6.5M8 4L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M12.5 10.5V11.25C12.5 12.2165 11.7165 13 10.75 13H5.25C4.2835 13 3.5 12.2165 3.5 11.25V10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (step === "method") {
-    return (
-      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="step-tab__icon-svg">
-        <circle cx="8" cy="8" r="4.75" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M6.7 8.35L7.6 9.25L9.65 7.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="step-tab__icon-svg">
-      <path d="M3.75 3.75H12.25V12.25H3.75V3.75Z" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M6 8L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function StepStateIndicator({ status, disabled }: { status: StepStatus; disabled: boolean }) {
   if (disabled) {
     return (
@@ -234,7 +209,6 @@ export function SearchFormCard({
     setMethodPlan("guided");
     setAdvancedHelpOpen(false);
     setIdentifyMode(null);
-    setActiveStep("method");
     setIsMainDragActive(false);
   }
 
@@ -274,13 +248,11 @@ export function SearchFormCard({
     if (plan === "guided") {
       setIdentifyMode("lens");
       setAdvancedHelpOpen(false);
-      setActiveStep("run");
       return;
     }
     setIdentifyMode("off");
     setAdvancedHelpOpen(false);
     if (plan === "automatic") setItemName("");
-    setActiveStep("method");
   }
 
   function renderStepBody(stepId: FormSectionKey) {
@@ -449,8 +421,8 @@ export function SearchFormCard({
                     chooseMethodPlan(planOrder[next]);
                   }}
                   className={[
-                    "plan-method-card relative overflow-visible rounded-2xl border px-4 py-4 text-left transition",
-                    selected ? "is-active" : "",
+                    "plan-method-card interactive-step relative overflow-visible rounded-2xl border px-4 py-4 text-left",
+                    selected ? "is-active interactive-step-selected" : "",
                     card.recommended ? "is-recommended" : "",
                     anyBusy ? "is-disabled cursor-not-allowed opacity-60" : "cursor-pointer",
                   ].join(" ")}
@@ -555,14 +527,14 @@ export function SearchFormCard({
                       {extrasSelected ? (
                         <div className="flex flex-wrap gap-2">
                           {extraPreviews.map((p) => (
-                            <div key={p.key} className="group relative h-12 w-12 overflow-hidden rounded-lg border border-white/10">
+                            <div key={p.key} className="group relative h-16 w-16 overflow-hidden rounded-lg border border-white/10">
                               <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
                               <button
                                 type="button"
                                 onClick={() => removeSlot(p.slotIndex)}
-                                className="absolute -right-1 -top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-caption text-[#f9f1e2] group-hover:flex"
+                                className="absolute right-1 top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-semibold leading-none text-[#f9f1e2] shadow-[0_2px_5px_rgba(74,54,39,0.24)] group-hover:inline-flex"
                               >
-                                x
+                                <span className="relative -translate-y-[0.5px]">x</span>
                               </button>
                             </div>
                           ))}
@@ -699,21 +671,12 @@ export function SearchFormCard({
                             <span className="step-tab__index" aria-hidden="true">
                               {index + 1}
                             </span>
-                            <span className="step-tab__icon">
-                              <StepIcon step={step.id} />
-                            </span>
                             <span className="step-tab__text">
                               <span className="step-tab__kicker">Step {index + 1}</span>
                               <span className="step-tab__title">{step.title}</span>
                             </span>
                           </span>
                           <span className="step-tab__right">
-                            <span className={["step-tab__badge", isActive ? "is-active" : ""].join(" ")}>
-                              {step.badgeText}
-                              {step.required && step.status !== "complete" ? (
-                                <span className="step-tab__badge-dot" aria-hidden="true" />
-                              ) : null}
-                            </span>
                             <StepStateIndicator status={step.status} disabled={step.disabled} />
                           </span>
                         </span>
@@ -729,9 +692,6 @@ export function SearchFormCard({
               >
                 <div className="step-tabs__panel-header">
                   <div className="step-tabs__panel-title-wrap">
-                    <span className="step-tabs__panel-icon">
-                      <StepIcon step={activeStepDef.id} />
-                    </span>
                     <div>
                       <div className="step-tabs__panel-title">{activeStepDef.title}</div>
                     </div>
@@ -776,21 +736,12 @@ export function SearchFormCard({
                           <span className="step-tab__index" aria-hidden="true">
                             {index + 1}
                           </span>
-                          <span className="step-tab__icon">
-                            <StepIcon step={step.id} />
-                          </span>
                           <span className="step-tab__text">
                             <span className="step-tab__kicker">Step {index + 1}</span>
                             <span className="step-tab__title">{step.title}</span>
                           </span>
                         </span>
                         <span className="step-tab__right">
-                          <span className={["step-tab__badge", isActive ? "is-active" : ""].join(" ")}>
-                            {step.badgeText}
-                            {step.required && step.status !== "complete" ? (
-                              <span className="step-tab__badge-dot" aria-hidden="true" />
-                            ) : null}
-                          </span>
                           <StepStateIndicator status={step.status} disabled={step.disabled} />
                         </span>
                       </span>

@@ -481,6 +481,7 @@ export default function MyNextFastAPIApp() {
             isEditingTitle={isEditingTitle}
             mainPreview={mainPreview}
             onSelect={selectLensCandidate}
+            onDeselect={resetLensSelection}
             onTitleChange={updateLensTitle}
             onToggleEdit={() => setIsEditingTitle((prev) => !prev)}
             onRunAnalysis={handleLensRunAnalysis}
@@ -491,9 +492,6 @@ export default function MyNextFastAPIApp() {
                 return Math.min(totalPages - 1, p + 1);
               })
             }
-            onReset={() => {
-              resetLensSelection();
-            }}
           />
         )}
 

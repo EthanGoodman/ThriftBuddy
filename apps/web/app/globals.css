@@ -1735,6 +1735,34 @@ textarea::placeholder {
   box-shadow: inset 0 0 0 1px rgba(127, 98, 74, 0.28);
 }
 
+.interactive-step {
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.interactive-step:hover:not(:disabled),
+.interactive-step:focus-visible:not(:disabled) {
+  border-color: rgba(127, 98, 74, 0.52);
+  background: linear-gradient(180deg, rgba(235, 217, 190, 0.92), rgba(222, 199, 168, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(132, 100, 75, 0.22);
+}
+
+.interactive-step-selected {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--panel-border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel-quiet));
+  box-shadow: 0 10px 24px rgba(86, 58, 40, 0.22);
+}
+
+.hover-step-like {
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.hover-step-like:hover:not(:disabled),
+.hover-step-like:focus-visible:not(:disabled) {
+  border-color: rgba(127, 98, 74, 0.52);
+  background: linear-gradient(180deg, rgba(235, 217, 190, 0.92), rgba(222, 199, 168, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(132, 100, 75, 0.22);
+}
+
 /* Method segmented control: force warm hover/active palette */
 .mode-segment {
   color: var(--foreground);
