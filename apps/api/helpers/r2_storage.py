@@ -2,6 +2,9 @@ import os, uuid
 import boto3
 from botocore.config import Config
 
+from dotenv import load_dotenv
+load_dotenv()
+
 s3 = boto3.client(
     "s3",
     endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",

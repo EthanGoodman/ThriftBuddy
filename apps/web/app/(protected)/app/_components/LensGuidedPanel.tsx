@@ -121,8 +121,7 @@ export function LensGuidedPanel({
               <span className="text-[var(--muted)]">•</span>
               <span className={flowStep === 3 ? "font-semibold text-[var(--foreground)]" : "text-[var(--muted)]"}>3. Run analysis</span>
             </div>
-            <div className="mt-3 text-2xl font-semibold text-[var(--foreground)]">Pick a match</div>
-            <div className="text-sm text-[var(--muted)]">Select the closest match.</div>
+            <div className="mt-3 text-2xl font-semibold text-[var(--foreground)]">Select the best match</div>
           </div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Possible matches</div>
 

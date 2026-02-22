@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CheckboxChip } from "@/components/CheckboxChip";
 
@@ -93,6 +93,34 @@ function StepStateIndicator({ status, disabled }: { status: StepStatus; disabled
   return <span className="step-tab__state step-tab__state--incomplete" aria-label="Incomplete" />;
 }
 
+function findScrollableAncestor(node: HTMLElement | null): HTMLElement | null {
+  let current = node?.parentElement ?? null;
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    const canScroll = (overflowY === "auto" || overflowY === "scroll") && current.scrollHeight > current.clientHeight;
+    if (canScroll) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function scrollMethodTargetIntoView(target: HTMLElement | null) {
+  if (!target) return;
+  const scrollParent = findScrollableAncestor(target);
+  if (scrollParent) {
+    const parentRect = scrollParent.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const top = scrollParent.scrollTop + (targetRect.top - parentRect.top) - 12;
+    scrollParent.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    return;
+  }
+
+  const targetRect = target.getBoundingClientRect();
+  const top = window.scrollY + targetRect.top - 16;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+}
+
 export function SearchFormCard({
   anyBusy,
   submitAttempted,
@@ -123,6 +151,10 @@ export function SearchFormCard({
   const [advancedHelpOpen, setAdvancedHelpOpen] = useState(false);
   const [isMainDragActive, setIsMainDragActive] = useState(false);
   const [ownTitleRequired, setOwnTitleRequired] = useState(false);
+  const automaticOptionsRef = useRef<HTMLDivElement | null>(null);
+  const ownTitleSectionRef = useRef<HTMLDivElement | null>(null);
+  const automaticAdvancedHelpButtonRef = useRef<HTMLButtonElement | null>(null);
+  const ownTitleInputRef = useRef<HTMLInputElement | null>(null);
   const runLabel = anyBusy
     ? "Running..."
     : !identifyMode
@@ -132,6 +164,8 @@ export function SearchFormCard({
       : "Start Analysis";
   const safeItemName = typeof itemName === "string" ? itemName : "";
   const safeTextInput = typeof textInput === "string" ? textInput : "";
+  const selectedMethodPlan: MethodPlan | null =
+    identifyMode === "lens" ? "guided" : identifyMode === "off" ? (methodPlan === "own" ? "own" : "automatic") : null;
   const ownTitleMissing = methodPlan === "own" && !safeItemName.trim();
   const emptyExtraSlot = Math.max(0, files.findIndex((file) => file == null));
   const extrasSelected = extraPreviews.length > 0;
@@ -192,6 +226,25 @@ export function SearchFormCard({
     ? activeStep
     : orderedSteps[0] ?? "upload";
   const activeStepDef = steps.find((step) => step.id === activeStepId) ?? steps[0];
+
+  useEffect(() => {
+    if (activeStepId !== "method") return;
+    if (selectedMethodPlan === "automatic") {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollMethodTargetIntoView(automaticAdvancedHelpButtonRef.current ?? automaticOptionsRef.current);
+        });
+      });
+      return;
+    }
+    if (selectedMethodPlan === "own") {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollMethodTargetIntoView(ownTitleInputRef.current ?? ownTitleSectionRef.current);
+        });
+      });
+    }
+  }, [activeStepId, selectedMethodPlan]);
 
   function selectStep(step: StepDef) {
     if (step.id === "run" && ownTitleMissing) {
@@ -338,39 +391,64 @@ export function SearchFormCard({
             className="hidden"
             disabled={anyBusy}
           />
+
+          <button
+            type="button"
+            disabled={anyBusy || !mainImage}
+            onClick={() => setActiveStep("method")}
+            className={[
+              "mt-4 w-full rounded-xl px-4 py-3 text-body font-semibold transition duration-200 transform-gpu",
+              anyBusy || !mainImage
+                ? "bg-white/10 text-[var(--muted)] cursor-not-allowed scale-[1]"
+                : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)] shadow-lg shadow-[rgba(111,68,45,0.25)] scale-[1.01]",
+            ].join(" ")}
+          >
+            Continue
+          </button>
         </div>
       );
     }
 
     if (stepId === "method") {
-      const selectedPlan: MethodPlan | null =
-        identifyMode === "lens" ? "guided" : identifyMode === "off" ? (methodPlan === "own" ? "own" : "automatic") : null;
+      const selectedPlan = selectedMethodPlan;
       const cards: Array<{
         id: MethodPlan;
         title: string;
-        badge?: string;
+        heroValue: string;
+        heroMicro: string;
         recommended?: boolean;
-        recommendedHint?: string;
-        bestFor: string;
+        keyFacts: Array<{ label: string; value: string; strong?: string }>;
+        nextStep: string;
         bullets: string[];
       }> = [
         {
           id: "guided",
+          heroValue: "Best accuracy",
+          heroMicro: "You confirm the match before searching",
           title: "Guided AI",
-          badge: "Best accuracy",
           recommended: true,
-          bestFor: "Best accuracy - you confirm the match first.",
+          keyFacts: [
+            { label: "Photos", value: "1 only", strong: "1 only" },
+            { label: "Extra photos", value: "No" },
+            { label: "You type title", value: "No" },
+          ],
+          nextStep: "Next: you'll pick the closest match.",
           bullets: [
             "Pick the closest visual match",
             "Refine title before searching",
-            "Best for most items",
           ],
         },
         {
           id: "automatic",
+          heroValue: "Lowest effort",
+          heroMicro: "We generate the title for you",
           title: "Automatic",
-          badge: "Lowest effort",
-          bestFor: "AI generates a search title from your image.",
+          keyFacts: [
+            { label: "Photos", value: "1+", strong: "1+" },
+            { label: "Extra photos", value: "Yes" },
+            { label: "You type title", value: "No" },
+          ],
+          nextStep: "Next: we generate a title, then you can add extra photos/details.",
           bullets: [
             "No match-picking step",
             "Optional advanced help available",
@@ -379,9 +457,15 @@ export function SearchFormCard({
         },
         {
           id: "own",
-          title: "Use my own title (skip AI)",
-          badge: "Most control",
-          bestFor: "Fastest - skip AI and search directly with your title.",
+          heroValue: "Fastest",
+          heroMicro: "Skip AI and search immediately",
+          title: "Use my own title",
+          keyFacts: [
+            { label: "Photos", value: "Not used" },
+            { label: "Extra photos", value: "No" },
+            { label: "You type title", value: "Yes" },
+          ],
+          nextStep: "Next: we search marketplaces immediately.",
           bullets: [
             "Bypasses AI matching",
             "You control the exact query",
@@ -397,13 +481,16 @@ export function SearchFormCard({
             {cards.map((card) => {
               const selected = selectedPlan === card.id;
               return (
-                <button
+                <div
                   key={card.id}
-                  type="button"
                   role="radio"
                   aria-checked={selected}
-                  disabled={anyBusy}
-                  onClick={() => chooseMethodPlan(card.id)}
+                  aria-disabled={anyBusy}
+                  tabIndex={anyBusy ? -1 : 0}
+                  onClick={() => {
+                    if (anyBusy) return;
+                    chooseMethodPlan(card.id);
+                  }}
                   onKeyDown={(e) => {
                     if (anyBusy) return;
                     if (e.key === "Enter" || e.key === " ") {
@@ -413,7 +500,7 @@ export function SearchFormCard({
                     }
                     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
                     e.preventDefault();
-                    const current = planOrder.indexOf(methodPlan);
+                    const current = planOrder.indexOf(selectedPlan ?? methodPlan);
                     const next =
                       e.key === "ArrowRight"
                         ? (current + 1) % planOrder.length
@@ -421,63 +508,127 @@ export function SearchFormCard({
                     chooseMethodPlan(planOrder[next]);
                   }}
                   className={[
-                    "plan-method-card interactive-step relative overflow-visible rounded-2xl border px-4 py-4 text-left",
+                    "plan-method-card interactive-step relative overflow-visible rounded-2xl border px-4 py-4 text-left h-full flex flex-col",
                     selected ? "is-active interactive-step-selected" : "",
                     card.recommended ? "is-recommended" : "",
                     anyBusy ? "is-disabled cursor-not-allowed opacity-60" : "cursor-pointer",
                   ].join(" ")}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      {card.recommended ? (
-                        <div className="plan-method-card__recommended">Recommended</div>
-                      ) : null}
-                      <div className="text-[24px] leading-none font-semibold text-[var(--foreground)]">{card.title}</div>
-                      {card.recommendedHint ? (
-                        <div className="mt-1 text-[12px] font-semibold text-[rgba(96,70,50,0.95)]">{card.recommendedHint}</div>
-                      ) : null}
-                      <div className="mt-2 text-[14px] leading-snug text-[var(--muted)]">{card.bestFor}</div>
+                  {card.recommended ? <div className="plan-method-card__recommended">Recommended</div> : null}
+
+                  <div className="flex items-start justify-between gap-3 min-h-[6.9rem]">
+                    <div className="min-w-0 flex-1">
+                      <div className="h-[1.1rem]">
+                        {!card.recommended ? <span aria-hidden="true" className="block h-full" /> : null}
+                      </div>
+                      <h3
+                        className="mt-0.5 truncate text-[25px] leading-tight font-semibold text-[rgba(72,49,33,1)] no-underline"
+                        style={{ textDecoration: "none", borderBottom: "none" }}
+                      >
+                        {card.heroValue}
+                      </h3>
+                      <div className="mt-0.5 truncate text-[11px] leading-snug text-[rgba(96,72,54,0.82)]" title={card.heroMicro}>
+                        {card.heroMicro}
+                      </div>
+                      <div className="mt-1 text-[18px] leading-tight font-medium text-[rgba(93,71,54,0.86)]">{card.title}</div>
                     </div>
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[rgba(127,98,74,0.5)] bg-[rgba(245,234,214,0.72)]">
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        "mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-[rgba(245,234,214,0.52)] transition-colors",
+                        selected
+                          ? "border-[rgba(127,98,74,0.62)]"
+                          : "border-[rgba(127,98,74,0.25)]",
+                      ].join(" ")}
+                    >
                       {selected ? (
                         <span className="h-2.5 w-2.5 rounded-full bg-[rgba(127,98,74,0.9)]" />
                       ) : null}
                     </span>
                   </div>
 
-                  <div className="mt-3 border-t border-[rgba(127,98,74,0.22)] pt-3">
-                    <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[rgba(95,70,52,0.9)]">Includes</div>
+                  <div className="mt-2 min-h-[4.75rem]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgba(95,70,52,0.82)]">Key facts</div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {card.keyFacts.map((line) => {
+                        const hasStrong = Boolean(line.strong && line.value.includes(line.strong));
+                        const [beforeStrong, afterStrong] = hasStrong
+                          ? line.value.split(line.strong as string, 2)
+                          : ["", ""];
+                        return (
+                          <div
+                            key={`${card.id}-${line.label}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-[rgba(127,98,74,0.2)] bg-[rgba(243,232,214,0.5)] px-2 py-1 text-[11px] leading-none text-[rgba(88,65,48,0.96)]"
+                          >
+                            <span className="text-[rgba(108,83,62,0.9)]">{line.label}:</span>
+                            <span>
+                              {hasStrong ? (
+                                <>
+                                  {beforeStrong}
+                                  <strong className="font-semibold text-[var(--foreground)]">{line.strong}</strong>
+                                  {afterStrong}
+                                </>
+                              ) : (
+                                line.value
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <ul className="mt-2 space-y-1.5 text-[13px] text-[var(--foreground)]">
-                    {card.bullets.map((bullet) => (
-                      <li key={bullet} className="flex items-start gap-2">
-                        <span className="mt-[3px] inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[rgba(126,99,75,0.46)] bg-[rgba(241,229,208,0.72)]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[rgba(127,98,74,0.85)]" />
-                        </span>
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
 
-                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-[rgba(127,98,74,0.18)] pt-3">
-                    {card.badge ? (
-                      <span className="rounded-full border border-[rgba(126,99,75,0.38)] bg-[rgba(233,218,196,0.92)] px-2.5 py-0.5 text-[11px] font-semibold text-[rgba(100,74,56,0.95)]">
-                        {card.badge}
-                      </span>
-                    ) : (
-                      <span />
-                    )}
-                    <span className="rounded-full border border-[rgba(126,99,75,0.45)] bg-[rgba(237,223,201,0.9)] px-3 py-1 text-[11px] font-semibold text-[rgba(95,70,52,0.96)]">
-                      {selected ? "Selected" : "Select"}
-                    </span>
+                  <div className="mt-3 min-h-[7.25rem] border-t border-[rgba(127,98,74,0.22)] pt-3">
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[rgba(95,70,52,0.9)]">Includes</div>
+                    <ul className="mt-2 space-y-1.5 text-[13px] text-[var(--foreground)]">
+                      {card.bullets.map((bullet) => (
+                        <li key={bullet} className="flex items-start gap-2">
+                          <span className="mt-[3px] inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[rgba(126,99,75,0.46)] bg-[rgba(241,229,208,0.72)]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[rgba(127,98,74,0.85)]" />
+                          </span>
+                          <span className="truncate">{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </button>
+
+                  <div className="mt-auto min-h-[3.25rem] border-t border-[rgba(127,98,74,0.18)] pt-3">
+                    <div className="truncate text-[12px] leading-snug text-[rgba(96,72,54,0.88)]" title={card.nextStep}>
+                      {card.nextStep}
+                    </div>
+                  </div>
+                </div>
               );
             })}
           </div>
 
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={!selectedPlan || anyBusy}
+              onClick={() => {
+                if (selectedPlan === "own" && ownTitleMissing) {
+                  setOwnTitleRequired(true);
+                  return;
+                }
+                setActiveStep("run");
+              }}
+              className={[
+                "w-full rounded-xl px-4 py-3 text-body font-semibold transition duration-200 transform-gpu",
+                !selectedPlan || anyBusy
+                  ? "bg-white/10 text-[var(--muted)] cursor-not-allowed scale-[1]"
+                  : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)] shadow-lg shadow-[rgba(111,68,45,0.25)] scale-[1.01]",
+              ].join(" ")}
+            >
+              Continue
+            </button>
+            {submitAttempted && !selectedPlan ? (
+              <div className="mt-2 text-caption font-semibold text-[var(--danger)]">Select a search method to continue.</div>
+            ) : null}
+          </div>
+
           {selectedPlan === "automatic" ? (
-            <div className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
+            <div ref={automaticOptionsRef} className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
               <div className="text-body font-semibold text-[var(--foreground)]">Selected: Automatic</div>
               <div className="mt-1 text-caption text-[var(--muted)]">
                 We&apos;ll generate a search title from your image.
@@ -488,6 +639,7 @@ export function SearchFormCard({
 
               <div className="mt-4 rounded-lg border border-[var(--panel-border)] bg-[color-mix(in_srgb,var(--panel-quiet)_84%,white)]">
                 <button
+                  ref={automaticAdvancedHelpButtonRef}
                   type="button"
                   onClick={() => setAdvancedHelpOpen((v) => !v)}
                   className="flex w-full items-center justify-between px-3 py-2 text-left"
@@ -569,11 +721,12 @@ export function SearchFormCard({
           ) : null}
 
           {selectedPlan === "own" ? (
-            <div className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
+            <div ref={ownTitleSectionRef} className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
               <div className="mt-3 space-y-2">
                 <label className="text-body font-semibold text-[var(--foreground)]">Enter your search title</label>
                 <div className="text-caption text-[var(--muted)]">This title will be used directly for marketplace search.</div>
                 <input
+                  ref={ownTitleInputRef}
                   type="text"
                   value={safeItemName}
                   onChange={(e) => {
@@ -596,9 +749,6 @@ export function SearchFormCard({
             </div>
           ) : null}
 
-          {submitAttempted && !identifyMode ? (
-            <div className="mt-3 text-caption text-[var(--danger)]">Choose a search method to continue.</div>
-          ) : null}
         </div>
       );
     }
