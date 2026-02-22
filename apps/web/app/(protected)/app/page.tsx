@@ -415,25 +415,10 @@ export default function MyNextFastAPIApp() {
               <button
                 type="button"
                 onClick={handleEditInputs}
-                className="hidden items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)] sm:inline-flex"
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
               >
                 Edit inputs
               </button>
-              <details className="relative sm:hidden">
-                <summary className="list-none rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]">
-                  <span aria-hidden="true">...</span>
-                  <span className="sr-only">More actions</span>
-                </summary>
-                <div className="absolute right-0 z-10 mt-2 w-40 rounded-xl border border-white/10 bg-[var(--panel)] p-1 text-[11px] text-[var(--foreground)] shadow-lg">
-                  <button
-                    type="button"
-                    onClick={handleEditInputs}
-                    className="w-full rounded-lg px-3 py-2 text-left font-semibold transition hover:bg-white/10"
-                  >
-                    Edit inputs
-                  </button>
-                </div>
-              </details>
             </div>
           </div>
         ) : null}

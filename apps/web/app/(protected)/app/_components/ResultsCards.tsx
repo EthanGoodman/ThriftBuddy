@@ -112,6 +112,7 @@ export function ResultsCards({
 }: ResultsCardsProps) {
   const [soldExpanded, setSoldExpanded] = useState(false);
   const [activeExpanded, setActiveExpanded] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [isCondensed, setIsCondensed] = useState(false);
@@ -150,6 +151,20 @@ export function ResultsCards({
     activeLowAnimated != null && activeHighAnimated != null
       ? `${fmtMoney(activeLowAnimated)} - ${fmtMoney(activeHighAnimated)}`
       : activeRangeDisplay.lowHigh;
+  const collapsedListingCount = isMobileViewport ? 1 : 3;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 639px)");
+    const sync = () => setIsMobileViewport(media.matches);
+    sync();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", sync);
+      return () => media.removeEventListener("change", sync);
+    }
+    media.addListener(sync);
+    return () => media.removeListener(sync);
+  }, []);
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -325,7 +340,7 @@ export function ResultsCards({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
           <div className="text-sm font-semibold text-[var(--foreground)]">Recently Sold</div>
-          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--success)]">
+          <span className="rounded-full border border-[rgba(95,121,84,0.32)] bg-[rgba(205,219,191,0.94)] px-2 py-0.5 text-[10px] font-semibold text-[rgba(61,87,55,0.96)] shadow-sm">
             {soldCount} items
           </span>
           </div>
@@ -338,7 +353,7 @@ export function ResultsCards({
               dismissedKeys={dismissedSold}
               onDismiss={onDismissSold}
               variant="sold"
-              maxItems={soldExpanded ? undefined : 3}
+              maxItems={soldExpanded ? undefined : collapsedListingCount}
             />
             <div className="flex justify-center">
               <button
@@ -369,7 +384,7 @@ export function ResultsCards({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
           <div className="text-sm font-semibold text-[var(--foreground)]">Active Listings</div>
-          <span className="rounded-full bg-[var(--accent)]/16 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
+          <span className="rounded-full border border-[rgba(127,98,74,0.34)] bg-[rgba(233,220,201,0.94)] px-2 py-0.5 text-[10px] font-semibold text-[rgba(95,70,52,0.98)] shadow-sm">
             {activeCount} items
           </span>
           </div>
@@ -382,7 +397,7 @@ export function ResultsCards({
               dismissedKeys={dismissedActive}
               onDismiss={onDismissActive}
               variant="active"
-              maxItems={activeExpanded ? undefined : 3}
+              maxItems={activeExpanded ? undefined : collapsedListingCount}
             />
             <div className="flex justify-center">
               <button

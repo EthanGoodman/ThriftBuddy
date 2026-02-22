@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { LensCandidate, Preview } from "../types";
 
@@ -49,7 +49,8 @@ export function LensGuidedPanel({
 }: LensGuidedPanelProps) {
   const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
   const selectionModuleRef = useRef<HTMLDivElement | null>(null);
-  const PAGE_SIZE = 3;
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const PAGE_SIZE = isMobileViewport ? 1 : 3;
   const pageCount = Math.max(1, Math.ceil(candidates.length / PAGE_SIZE));
   const pageIndex = Math.min(page, pageCount - 1);
   const start = pageIndex * PAGE_SIZE;
@@ -84,6 +85,19 @@ export function LensGuidedPanel({
     el.style.height = `${el.scrollHeight}px`;
   }, [normalizedTitle]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 639px)");
+    const sync = () => setIsMobileViewport(media.matches);
+    sync();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", sync);
+      return () => media.removeEventListener("change", sync);
+    }
+    media.addListener(sync);
+    return () => media.removeListener(sync);
+  }, []);
+
   const statusLabel = isLoading
     ? "Searching with Google Lens..."
     : candidates.length
@@ -91,19 +105,19 @@ export function LensGuidedPanel({
       : "Waiting for search";
 
   return (
-    <div className="rounded-[28px] panel-glass p-6 md:p-10 space-y-6">
+    <div className="rounded-[28px] panel-glass p-4 md:p-10 space-y-6 min-w-0">
       <div>
         <div className="text-sm font-semibold text-[var(--foreground)]">Guided AI Analysis</div>
         <div className="text-xs text-[var(--muted)]">{statusLabel}</div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid gap-5 min-w-0 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="space-y-4">
           <div className="rounded-2xl panel-strong p-4">
             <div className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">Your image</div>
-            <div className="mt-3 overflow-hidden rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] aspect-[4/5] max-h-[320px]">
+            <div className="mt-3 mx-auto w-full max-w-[320px] overflow-hidden rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] aspect-[4/5] max-h-[320px] flex items-center justify-center">
               {mainPreview ? (
-                <img src={mainPreview.url} alt={mainPreview.name} className="h-full w-full object-contain bg-[var(--panel-quiet)]" />
+                <img src={mainPreview.url} alt={mainPreview.name} className="h-full w-full object-contain object-center bg-[var(--panel-quiet)]" />
               ) : (
                 <div className="flex h-full items-center justify-center text-xs text-[var(--muted)]">Upload a photo to preview</div>
               )}
@@ -111,7 +125,7 @@ export function LensGuidedPanel({
           </div>
         </aside>
 
-        <section className="rounded-2xl panel-strong p-6">
+        <section className="rounded-2xl panel-strong p-4 md:p-6 min-w-0">
           <div className="mb-4">
             <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Workflow</div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -123,7 +137,9 @@ export function LensGuidedPanel({
             </div>
             <div className="mt-3 text-2xl font-semibold text-[var(--foreground)]">Select the best match</div>
           </div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Possible matches</div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            Possible matches {candidates.length > 0 ? `(${candidates.length})` : ""}
+          </div>
 
           {isLoading ? (
             <div className="matches-loading" aria-busy="true">
@@ -156,7 +172,7 @@ export function LensGuidedPanel({
               No matches yet. Click Run to fetch Lens results.
             </div>
           ) : (
-            <div>
+            <div className="min-w-0">
               <div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {visible.map((item, index) => {
@@ -229,12 +245,12 @@ export function LensGuidedPanel({
                           ) : null}
                         </div>
 
-                        <div className="space-y-2 p-3">
+                        <div className="space-y-2 p-3 min-w-0">
                           <div className="truncate text-sm font-semibold text-[var(--foreground)]">{stripTrailingEllipsis(item.title) || "Lens result"}</div>
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
                             <span
                               className={[
-                                "rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                                "rounded-full px-2.5 py-1 text-[10px] font-semibold shrink-0",
                                 isSelected
                                   ? "border border-[rgba(84,128,84,0.62)] bg-[rgba(208,234,206,0.96)] text-[rgba(46,92,46,0.98)]"
                                   : "border border-[rgba(126,99,75,0.4)] bg-[rgba(237,223,201,0.88)] text-[rgba(95,70,52,0.96)]",
@@ -242,7 +258,7 @@ export function LensGuidedPanel({
                             >
                               {isSelected ? "Selected ✓" : "Select this match"}
                             </span>
-                            {!isSelected ? <span className="text-[10px] text-[var(--muted)]">Tap to select</span> : null}
+                            {!isSelected ? <span className="hidden sm:inline text-[10px] text-[var(--muted)]">Tap to select</span> : null}
                           </div>
                         </div>
                       </div>
@@ -299,18 +315,18 @@ export function LensGuidedPanel({
                 <aside className="mt-4">
                   <div
                     ref={selectionModuleRef}
-                    className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-4 py-3 space-y-3 opacity-100 translate-y-0 transition-all duration-200 ease-out"
+                    className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 md:px-4 py-3 space-y-3 opacity-100 translate-y-0 transition-all duration-200 ease-out min-w-0"
                   >
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Selected result</div>
                     <div className="mt-1 text-xs text-[var(--muted)]">Refine title, then run.</div>
                   </div>
-                  <div className="flex items-center justify-between gap-3 pb-2 border-b border-[rgba(129,101,78,0.34)]">
+                  <div className="flex min-w-0 flex-col items-stretch gap-3 pb-2 border-b border-[rgba(129,101,78,0.34)] sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="h-14 w-14 overflow-hidden rounded-lg bg-[var(--panel)]">
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--panel)]">
                         <img src={selectedCandidate?.image} alt={selectedCandidate?.title || "Selected item"} className="h-full w-full object-cover" />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-[var(--foreground)]">{selectedCandidate?.title || "Selected item"}</div>
                       </div>
                     </div>
@@ -318,7 +334,7 @@ export function LensGuidedPanel({
                       type="button"
                       disabled={!hasSelection || !originalTitle || controlsDisabled}
                       onClick={() => onTitleChange(originalTitle)}
-                      className="interactive-step shrink-0 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="interactive-step w-full shrink-0 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                     >
                       Use original title
                     </button>
@@ -345,7 +361,7 @@ export function LensGuidedPanel({
                           : "border-[rgba(128,101,78,0.32)] bg-[rgba(237,222,199,0.96)] text-[var(--muted)] cursor-not-allowed",
                       ].join(" ")}
                     />
-                    <div className="mt-1 flex items-center justify-between text-[11px] text-[var(--muted)]">
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--muted)]">
                       <span>Used for marketplace search.</span>
                       <span>{normalizedTitle.length} chars</span>
                     </div>
