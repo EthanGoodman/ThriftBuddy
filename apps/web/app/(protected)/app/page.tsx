@@ -417,7 +417,7 @@ export default function MyNextFastAPIApp() {
                 onClick={handleEditInputs}
                 className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-quiet)] px-3 py-1.5 text-[11px] font-semibold text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--panel-quiet)_78%,white)]"
               >
-                Edit inputs
+                Edit
               </button>
             </div>
           </div>
