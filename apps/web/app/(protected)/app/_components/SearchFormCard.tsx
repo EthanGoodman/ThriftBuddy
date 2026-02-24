@@ -148,6 +148,11 @@ export function SearchFormCard({
 }: SearchFormCardProps) {
   const [activeStep, setActiveStep] = useState<FormSectionKey>("upload");
   const [methodPlan, setMethodPlan] = useState<MethodPlan>("guided");
+  const [methodWhatHappensOpen, setMethodWhatHappensOpen] = useState<Record<MethodPlan, boolean>>({
+    guided: false,
+    automatic: false,
+    own: false,
+  });
   const [advancedHelpOpen, setAdvancedHelpOpen] = useState(false);
   const [isMainDragActive, setIsMainDragActive] = useState(false);
   const [ownTitleRequired, setOwnTitleRequired] = useState(false);
@@ -166,7 +171,7 @@ export function SearchFormCard({
   const safeTextInput = typeof textInput === "string" ? textInput : "";
   const selectedMethodPlan: MethodPlan | null =
     identifyMode === "lens" ? "guided" : identifyMode === "off" ? (methodPlan === "own" ? "own" : "automatic") : null;
-  const ownTitleMissing = methodPlan === "own" && !safeItemName.trim();
+  const ownTitleMissing = selectedMethodPlan === "own" && !safeItemName.trim();
   const emptyExtraSlot = Math.max(0, files.findIndex((file) => file == null));
   const extrasSelected = extraPreviews.length > 0;
   const steps = useMemo<StepDef[]>(() => {
@@ -188,7 +193,7 @@ export function SearchFormCard({
             ? "Guided AI"
             : identifyMode === "off"
               ? methodPlan === "own"
-                ? "Own title"
+                ? "Own item name"
                 : "Automatic"
               : "Choose one",
         required: true,
@@ -296,6 +301,12 @@ export function SearchFormCard({
   }
 
   function chooseMethodPlan(plan: MethodPlan) {
+    if (selectedMethodPlan === plan) {
+      setOwnTitleRequired(false);
+      setIdentifyMode(null);
+      setAdvancedHelpOpen(false);
+      return;
+    }
     setOwnTitleRequired(false);
     setMethodPlan(plan);
     if (plan === "guided") {
@@ -413,63 +424,59 @@ export function SearchFormCard({
       const selectedPlan = selectedMethodPlan;
       const cards: Array<{
         id: MethodPlan;
-        title: string;
         heroValue: string;
         heroMicro: string;
         recommended?: boolean;
-        keyFacts: Array<{ label: string; value: string; strong?: string }>;
-        nextStep: string;
-        bullets: string[];
+        keyFacts: Array<{ label: string; value: string }>;
+        whatHappens: Array<{ label: string; value: string }>;
       }> = [
+        {
+          id: "own",
+          heroValue: "Fastest",
+          heroMicro: "Skip AI - enter item name directly",
+          keyFacts: [
+            { label: "Photos used", value: "None" },
+            { label: "Item name", value: "User entered" },
+            { label: "AI involvement", value: "None" },
+            { label: "Time to results", value: "Fast" },
+          ],
+          whatHappens: [
+            { label: "First", value: "Enter your own item name" },
+            { label: "Then", value: "Skip image matching and item name generation" },
+            { label: "Search starts", value: "Run marketplace searches immediately" },
+          ],
+        },
         {
           id: "guided",
           heroValue: "Best accuracy",
           heroMicro: "You confirm the match before searching",
-          title: "Guided AI",
           recommended: true,
           keyFacts: [
-            { label: "Photos", value: "1 only", strong: "1 only" },
-            { label: "Extra photos", value: "No" },
-            { label: "You type title", value: "No" },
+            { label: "Photos used", value: "1" },
+            { label: "Item name", value: "Generated" },
+            { label: "AI involvement", value: "High" },
+            { label: "Time to results", value: "Medium" },
           ],
-          nextStep: "Next: you'll pick the closest match.",
-          bullets: [
-            "Pick the closest visual match",
-            "Refine title before searching",
+          whatHappens: [
+            { label: "First", value: "Show likely visual matches" },
+            { label: "Then", value: "Confirm the closest match and item name" },
+            { label: "Search starts", value: "Run marketplace searches after confirmation" },
           ],
         },
         {
           id: "automatic",
           heroValue: "Lowest effort",
-          heroMicro: "We generate the title for you",
-          title: "Automatic",
+          heroMicro: "We do everything for you",
           keyFacts: [
-            { label: "Photos", value: "1+", strong: "1+" },
-            { label: "Extra photos", value: "Yes" },
-            { label: "You type title", value: "No" },
+            { label: "Photos used", value: "1+" },
+            { label: "Item name", value: "Generated" },
+            { label: "AI involvement", value: "High" },
+            { label: "Time to results", value: "Slow" },
           ],
-          nextStep: "Next: we generate a title, then you can add extra photos/details.",
-          bullets: [
-            "No match-picking step",
-            "Optional advanced help available",
-            "Lowest effort option",
-          ],
-        },
-        {
-          id: "own",
-          heroValue: "Fastest",
-          heroMicro: "Skip AI and search immediately",
-          title: "Use my own title",
-          keyFacts: [
-            { label: "Photos", value: "Not used" },
-            { label: "Extra photos", value: "No" },
-            { label: "You type title", value: "Yes" },
-          ],
-          nextStep: "Next: we search marketplaces immediately.",
-          bullets: [
-            "Bypasses AI matching",
-            "You control the exact query",
-            "Great when you know the item",
+          whatHappens: [
+            { label: "First", value: "Identify the item from your image" },
+            { label: "Then", value: "Generate an item name (with optional advanced help)" },
+            { label: "Search starts", value: "Run marketplace searches after item name generation" },
           ],
         },
       ];
@@ -508,7 +515,8 @@ export function SearchFormCard({
                     chooseMethodPlan(planOrder[next]);
                   }}
                   className={[
-                    "plan-method-card interactive-step relative overflow-visible rounded-2xl border px-4 py-4 text-left h-full flex flex-col",
+                    "plan-method-card relative overflow-visible rounded-2xl border px-4 py-4 text-left h-full flex flex-col",
+                    selected ? "" : "interactive-step",
                     selected ? "is-active interactive-step-selected" : "",
                     card.recommended ? "is-recommended" : "",
                     anyBusy ? "is-disabled cursor-not-allowed opacity-60" : "cursor-pointer",
@@ -530,7 +538,6 @@ export function SearchFormCard({
                       <div className="mt-0.5 truncate text-[11px] leading-snug text-[rgba(96,72,54,0.82)]" title={card.heroMicro}>
                         {card.heroMicro}
                       </div>
-                      <div className="mt-1 text-[18px] leading-tight font-medium text-[rgba(93,71,54,0.86)]">{card.title}</div>
                     </div>
                     <span
                       aria-hidden="true"
@@ -547,55 +554,85 @@ export function SearchFormCard({
                     </span>
                   </div>
 
-                  <div className="mt-2 min-h-[4.75rem]">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgba(95,70,52,0.82)]">Key facts</div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {card.keyFacts.map((line) => {
-                        const hasStrong = Boolean(line.strong && line.value.includes(line.strong));
-                        const [beforeStrong, afterStrong] = hasStrong
-                          ? line.value.split(line.strong as string, 2)
-                          : ["", ""];
-                        return (
-                          <div
-                            key={`${card.id}-${line.label}`}
-                            className="inline-flex items-center gap-1 rounded-full border border-[rgba(127,98,74,0.2)] bg-[rgba(243,232,214,0.5)] px-2 py-1 text-[11px] leading-none text-[rgba(88,65,48,0.96)]"
-                          >
-                            <span className="text-[rgba(108,83,62,0.9)]">{line.label}:</span>
-                            <span>
-                              {hasStrong ? (
-                                <>
-                                  {beforeStrong}
-                                  <strong className="font-semibold text-[var(--foreground)]">{line.strong}</strong>
-                                  {afterStrong}
-                                </>
-                              ) : (
-                                line.value
-                              )}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 min-h-[7.25rem] border-t border-[rgba(127,98,74,0.22)] pt-3">
-                    <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[rgba(95,70,52,0.9)]">Includes</div>
-                    <ul className="mt-2 space-y-1.5 text-[13px] text-[var(--foreground)]">
-                      {card.bullets.map((bullet) => (
-                        <li key={bullet} className="flex items-start gap-2">
-                          <span className="mt-[3px] inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[rgba(126,99,75,0.46)] bg-[rgba(241,229,208,0.72)]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[rgba(127,98,74,0.85)]" />
-                          </span>
-                          <span className="truncate">{bullet}</span>
-                        </li>
+                  <div className="mt-2 min-h-[8.75rem]">
+                    <div className="text-[10px] tracking-[0.04em] text-[rgba(95,70,52,0.62)]">Key facts</div>
+                    <div className="mt-2 grid grid-cols-[max-content_1fr_max-content] items-center gap-y-1.5">
+                      {card.keyFacts.map((line) => (
+                        <div
+                          key={`${card.id}-key-${line.label}`}
+                          className="contents text-[11px]"
+                        >
+                          <span className="whitespace-nowrap pr-[2ch] text-[rgba(108,83,62,0.76)]">{line.label}</span>
+                          <span
+                            aria-hidden="true"
+                            className="w-full translate-y-[1px] border-b border-dotted border-[rgba(127,98,74,0.2)]"
+                          />
+                          <span className="whitespace-nowrap pl-[2ch] text-right font-semibold text-[rgba(68,47,33,0.96)]">{line.value}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+                    <div className="mt-3 border-b border-[rgba(127,98,74,0.16)]" />
                   </div>
 
-                  <div className="mt-auto min-h-[3.25rem] border-t border-[rgba(127,98,74,0.18)] pt-3">
-                    <div className="truncate text-[12px] leading-snug text-[rgba(96,72,54,0.88)]" title={card.nextStep}>
-                      {card.nextStep}
+                  <div className="mt-3 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMethodWhatHappensOpen((prev) => ({ ...prev, [card.id]: !prev[card.id] }));
+                      }}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      aria-label={methodWhatHappensOpen[card.id] ? "Collapse what happens next" : "Expand what happens next"}
+                      aria-expanded={methodWhatHappensOpen[card.id]}
+                      aria-controls={`method-what-happens-${card.id}`}
+                      className={[
+                        "group inline-flex items-center gap-1.5 self-start rounded-md px-1.5 py-0.5 motion-reduce:transition-none",
+                        anyBusy
+                          ? "cursor-not-allowed opacity-70"
+                          : "hover:bg-[rgba(127,98,74,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(127,98,74,0.18)]",
+                      ].join(" ")}
+                      disabled={anyBusy}
+                    >
+                      <span className="text-[10px] tracking-[0.04em] text-[rgba(95,70,52,0.62)] group-hover:text-[rgba(95,70,52,0.86)]">
+                        What happens next
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className={[
+                          "inline-flex h-4 w-4 items-center justify-center text-[rgba(108,83,62,0.68)] transition-transform duration-150 motion-reduce:transition-none",
+                          "group-hover:text-[rgba(108,83,62,0.9)]",
+                          methodWhatHappensOpen[card.id] ? "rotate-180" : "rotate-0",
+                        ].join(" ")}
+                      >
+                        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none">
+                          <path d="M4.5 6.5L8 10L11.5 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    </button>
+                    <div
+                      id={`method-what-happens-${card.id}`}
+                      aria-hidden={!methodWhatHappensOpen[card.id]}
+                      className={[
+                        "overflow-hidden transition-all duration-200 ease-out motion-reduce:transition-none",
+                        methodWhatHappensOpen[card.id] ? "mt-2 max-h-44 opacity-100" : "mt-0 max-h-0 opacity-0",
+                      ].join(" ")}
+                    >
+                      <div className="space-y-1.5">
+                        {card.whatHappens.map((line, index) => (
+                          <div key={`${card.id}-flow-${line.label}`} className="grid grid-cols-[1.25rem_1fr] items-start gap-x-2 text-[12px] leading-snug">
+                            <span className="text-right tabular-nums text-[rgba(108,83,62,0.72)]">{index + 1}.</span>
+                            <span className="text-[rgba(74,53,38,0.94)]">{line.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 border-b border-[rgba(127,98,74,0.16)]" />
                     </div>
+                  </div>
+
+                  <div className="mt-auto min-h-[3rem] pt-3">
+                    <div className="text-[11px] italic leading-snug text-[rgba(95,70,52,0.72)]">{card.bestFor}</div>
                   </div>
                 </div>
               );
@@ -631,7 +668,7 @@ export function SearchFormCard({
             <div ref={automaticOptionsRef} className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
               <div className="text-body font-semibold text-[var(--foreground)]">Selected: Automatic</div>
               <div className="mt-1 text-caption text-[var(--muted)]">
-                We&apos;ll generate a search title from your image.
+                We&apos;ll generate an item name from your image.
               </div>
               <div className="mt-3 text-caption text-[var(--muted)]">
                 Add optional details below.
@@ -723,8 +760,8 @@ export function SearchFormCard({
           {selectedPlan === "own" ? (
             <div ref={ownTitleSectionRef} className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
               <div className="mt-3 space-y-2">
-                <label className="text-body font-semibold text-[var(--foreground)]">Enter your search title</label>
-                <div className="text-caption text-[var(--muted)]">This title will be used directly for marketplace search.</div>
+                <label className="text-body font-semibold text-[var(--foreground)]">Enter your item name</label>
+                <div className="text-caption text-[var(--muted)]">This item name will be used directly for marketplace search.</div>
                 <input
                   ref={ownTitleInputRef}
                   type="text"
@@ -742,7 +779,7 @@ export function SearchFormCard({
                 />
                 {ownTitleRequired && ownTitleMissing ? (
                   <div className="text-caption font-semibold text-[var(--danger)]">
-                    Please enter a title before finding matches.
+                    Please enter an item name before finding matches.
                   </div>
                 ) : null}
               </div>

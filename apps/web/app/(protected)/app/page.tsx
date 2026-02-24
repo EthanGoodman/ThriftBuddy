@@ -337,7 +337,7 @@ export default function MyNextFastAPIApp() {
         return;
       }
       if (!effectiveTitle.trim()) {
-        setLensError("Select a match or edit the title before running.");
+        setLensError("Select a match or edit the item name before running.");
         setStep("pick_match");
         setScreen("guided");
         return;

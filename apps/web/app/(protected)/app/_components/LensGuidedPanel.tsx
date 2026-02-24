@@ -131,7 +131,7 @@ export function LensGuidedPanel({
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className={flowStep === 1 ? "font-semibold text-[var(--foreground)]" : "text-[var(--muted)]"}>1. Select a match</span>
               <span className="text-[var(--muted)]">•</span>
-              <span className={flowStep === 2 ? "font-semibold text-[var(--foreground)]" : "text-[var(--muted)]"}>2. Refine title</span>
+              <span className={flowStep === 2 ? "font-semibold text-[var(--foreground)]" : "text-[var(--muted)]"}>2. Refine item name</span>
               <span className="text-[var(--muted)]">•</span>
               <span className={flowStep === 3 ? "font-semibold text-[var(--foreground)]" : "text-[var(--muted)]"}>3. Run analysis</span>
             </div>
@@ -319,7 +319,7 @@ export function LensGuidedPanel({
                   >
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Selected result</div>
-                    <div className="mt-1 text-xs text-[var(--muted)]">Refine title, then run.</div>
+                    <div className="mt-1 text-xs text-[var(--muted)]">Refine item name, then run.</div>
                   </div>
                   <div className="flex min-w-0 flex-col items-stretch gap-3 pb-2 border-b border-[rgba(129,101,78,0.34)] sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
@@ -336,12 +336,12 @@ export function LensGuidedPanel({
                       onClick={() => onTitleChange(originalTitle)}
                       className="interactive-step w-full shrink-0 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                     >
-                      Use original title
+                      Use original item name
                     </button>
                   </div>
 
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Step 2: Refine title</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Step 2: Refine item name</div>
                     <div className="mt-1 text-[11px] text-[var(--muted)]">Tip: include brand + model + material for best results.</div>
                     <textarea
                       ref={titleInputRef}
@@ -387,12 +387,12 @@ export function LensGuidedPanel({
                       ) : !hasSelection ? (
                         "Select a match to continue"
                       ) : (
-                        "Search with this title"
+                        "Search with this item name"
                       )}
                     </button>
 
-                    {titleUpdated ? <div className="text-[11px] font-semibold text-[var(--success)]">Title updated ✓</div> : null}
-                    <div className="text-[11px] text-[var(--muted)]">Next: we&apos;ll search marketplaces using your refined title.</div>
+                    {titleUpdated ? <div className="text-[11px] font-semibold text-[var(--success)]">Item name updated ✓</div> : null}
+                    <div className="text-[11px] text-[var(--muted)]">Next: we&apos;ll search marketplaces using your refined item name.</div>
                   </div>
                   </div>
                 </aside>
