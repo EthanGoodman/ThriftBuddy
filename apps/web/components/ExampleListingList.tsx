@@ -52,7 +52,7 @@ export function ExampleListingsList({
 
   return (
     <div className={fullscreen ? "space-y-4" : "max-h-[360px] overflow-y-auto scrollbar-clean pr-2"}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {items.map(({ it, key }) => (
           <a
             key={key}

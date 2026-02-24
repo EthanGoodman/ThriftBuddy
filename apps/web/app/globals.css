@@ -183,7 +183,7 @@ body {
   transition: background 170ms ease, box-shadow 170ms ease;
 }
 
-.step-tabs-mobile__tab:hover {
+.step-tabs-mobile__tab:not(.is-active):hover {
   background: rgba(16, 24, 54, 0.76);
   box-shadow: inset 0 0 0 1px rgba(168, 187, 243, 0.2);
 }
@@ -222,7 +222,7 @@ body {
   transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
-.step-tab:hover {
+.step-tab:not(.is-active):hover {
   border-color: rgba(160, 180, 239, 0.42);
   background: linear-gradient(180deg, rgba(16, 26, 56, 0.82), rgba(10, 15, 36, 0.72));
   box-shadow: inset 0 0 0 1px rgba(178, 194, 243, 0.16);
@@ -1724,7 +1724,7 @@ textarea::placeholder {
 }
 
 /* Keep step rail hover states in the earthy palette */
-.step-tab:hover {
+.step-tab:not(.is-active):hover {
   border-color: rgba(127, 98, 74, 0.52);
   background: linear-gradient(180deg, rgba(235, 217, 190, 0.92), rgba(222, 199, 168, 0.9));
   box-shadow: inset 0 0 0 1px rgba(132, 100, 75, 0.22);
@@ -1748,7 +1748,7 @@ textarea::placeholder {
   color: var(--foreground);
 }
 
-.step-tabs-mobile__tab:hover {
+.step-tabs-mobile__tab:not(.is-active):hover {
   background: rgba(231, 213, 187, 0.9);
   box-shadow: inset 0 0 0 1px rgba(127, 98, 74, 0.28);
 }

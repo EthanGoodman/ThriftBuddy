@@ -630,10 +630,6 @@ export function SearchFormCard({
                       <div className="mt-3 border-b border-[rgba(127,98,74,0.16)]" />
                     </div>
                   </div>
-
-                  <div className="mt-auto min-h-[3rem] pt-3">
-                    <div className="text-[11px] italic leading-snug text-[rgba(95,70,52,0.72)]">{card.bestFor}</div>
-                  </div>
                 </div>
               );
             })}

@@ -151,7 +151,7 @@ export function ResultsCards({
     activeLowAnimated != null && activeHighAnimated != null
       ? `${fmtMoney(activeLowAnimated)} - ${fmtMoney(activeHighAnimated)}`
       : activeRangeDisplay.lowHigh;
-  const collapsedListingCount = isMobileViewport ? 1 : 3;
+  const collapsedListingCount = 4;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
