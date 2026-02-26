@@ -368,7 +368,7 @@ export function SearchFormCard({
                   />
                 </svg>
               </span>
-              <div className="text-upload-title font-semibold text-[var(--foreground)]">Upload Product Photo</div>
+              <div className="text-upload-title font-semibold text-[var(--foreground)]">Upload Photo</div>
               <div className="text-subtitle text-[var(--muted)]">Click to select or drag & drop your image here.</div>
               {submitAttempted && !mainImage ? (
                 <div className="text-caption text-[var(--danger)]">Main Image is required to submit.</div>
@@ -416,19 +416,21 @@ export function SearchFormCard({
             disabled={anyBusy}
           />
 
-          <button
-            type="button"
-            disabled={anyBusy || !mainImage}
-            onClick={() => setActiveStep("method")}
-            className={[
-              "mt-4 w-full rounded-xl px-4 py-3 text-body font-semibold transition duration-200 transform-gpu",
-              anyBusy || !mainImage
-                ? "bg-white/10 text-[var(--muted)] cursor-not-allowed scale-[1]"
-                : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)] shadow-lg shadow-[rgba(111,68,45,0.25)] scale-[1.01]",
-            ].join(" ")}
-          >
-            Continue
-          </button>
+          {mainImage ? (
+            <button
+              type="button"
+              disabled={anyBusy}
+              onClick={() => setActiveStep("method")}
+              className={[
+                "mt-4 w-full rounded-xl px-4 py-3 text-body font-semibold transition duration-200 transform-gpu",
+                anyBusy
+                  ? "bg-white/10 text-[var(--muted)] cursor-not-allowed scale-[1]"
+                  : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)] shadow-lg shadow-[rgba(111,68,45,0.25)] scale-[1.01]",
+              ].join(" ")}
+            >
+              Continue
+            </button>
+          ) : null}
         </div>
       );
     }
