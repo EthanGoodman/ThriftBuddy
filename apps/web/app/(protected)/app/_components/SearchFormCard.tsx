@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Camera, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 
 import { CheckboxChip } from "@/components/CheckboxChip";
 
@@ -44,6 +45,18 @@ type StepDef = {
   status: StepStatus;
   disabled: boolean;
 };
+
+function StepTabGlyph({ stepId }: { stepId: FormSectionKey }) {
+  if (stepId === "upload") {
+    return <Camera aria-hidden="true" className="block h-3.5 w-3.5" strokeWidth={1.8} />;
+  }
+
+  if (stepId === "method") {
+    return <SlidersHorizontal aria-hidden="true" className="block h-3.5 w-3.5" strokeWidth={1.8} />;
+  }
+
+  return <SearchIcon aria-hidden="true" className="block h-3.5 w-3.5" strokeWidth={1.8} />;
+}
 
 function StepStateIndicator({ status, disabled }: { status: StepStatus; disabled: boolean }) {
   if (disabled) {
@@ -435,10 +448,9 @@ export function SearchFormCard({
           heroValue: "Fastest",
           heroMicro: "Skip AI - enter item name directly",
           keyFacts: [
-            { label: "Photos used", value: "None" },
+            { label: "Photos", value: "1" },
             { label: "Item name", value: "User entered" },
-            { label: "AI involvement", value: "None" },
-            { label: "Time to results", value: "Fast" },
+            { label: "Speed", value: "Fast" },
           ],
           whatHappens: [
             { label: "First", value: "Enter your own item name" },
@@ -452,10 +464,9 @@ export function SearchFormCard({
           heroMicro: "You confirm the match before searching",
           recommended: true,
           keyFacts: [
-            { label: "Photos used", value: "1" },
-            { label: "Item name", value: "Generated" },
-            { label: "AI involvement", value: "High" },
-            { label: "Time to results", value: "Medium" },
+            { label: "Photos", value: "1" },
+            { label: "Item name", value: "User Confirmed" },
+            { label: "Speed", value: "Medium" },
           ],
           whatHappens: [
             { label: "First", value: "Show likely visual matches" },
@@ -468,10 +479,9 @@ export function SearchFormCard({
           heroValue: "Lowest effort",
           heroMicro: "We do everything for you",
           keyFacts: [
-            { label: "Photos used", value: "1+" },
+            { label: "Photos", value: "1+" },
             { label: "Item name", value: "Generated" },
-            { label: "AI involvement", value: "High" },
-            { label: "Time to results", value: "Slow" },
+            { label: "Speed", value: "Slow" },
           ],
           whatHappens: [
             { label: "First", value: "Identify the item from your image" },
@@ -484,6 +494,7 @@ export function SearchFormCard({
 
       return (
         <div className="mode-segmented-panel">
+          <div>
           <div role="radiogroup" aria-label="Search method plans" className="grid gap-3 lg:grid-cols-3">
             {cards.map((card) => {
               const selected = selectedPlan === card.id;
@@ -524,7 +535,7 @@ export function SearchFormCard({
                 >
                   {card.recommended ? <div className="plan-method-card__recommended">Recommended</div> : null}
 
-                  <div className="flex items-start justify-between gap-3 min-h-[6.9rem]">
+                  <div className="flex items-start justify-between gap-3 pb-5">
                     <div className="min-w-0 flex-1">
                       <div className="h-[1.1rem]">
                         {!card.recommended ? <span aria-hidden="true" className="block h-full" /> : null}
@@ -554,24 +565,19 @@ export function SearchFormCard({
                     </span>
                   </div>
 
-                  <div className="mt-2 min-h-[8.75rem]">
+                  <div className="pt-4">
                     <div className="text-[10px] tracking-[0.04em] text-[rgba(95,70,52,0.62)]">Key facts</div>
-                    <div className="mt-2 grid grid-cols-[max-content_1fr_max-content] items-center gap-y-1.5">
+                    <div className="mt-2 space-y-0.5">
                       {card.keyFacts.map((line) => (
                         <div
                           key={`${card.id}-key-${line.label}`}
-                          className="contents text-[11px]"
+                          className="flex items-center justify-between gap-4 border-b border-[rgba(127,98,74,0.12)] py-1 text-[11px]"
                         >
-                          <span className="whitespace-nowrap pr-[2ch] text-[rgba(108,83,62,0.76)]">{line.label}</span>
-                          <span
-                            aria-hidden="true"
-                            className="w-full translate-y-[1px] border-b border-dotted border-[rgba(127,98,74,0.2)]"
-                          />
-                          <span className="whitespace-nowrap pl-[2ch] text-right font-semibold text-[rgba(68,47,33,0.96)]">{line.value}</span>
+                          <span className="text-[rgba(108,83,62,0.76)]">{line.label}</span>
+                          <span className="text-right font-semibold text-[rgba(68,47,33,0.96)]">{line.value}</span>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-3 border-b border-[rgba(127,98,74,0.16)]" />
                   </div>
 
                   <div className="mt-3 pt-0.5">
@@ -634,31 +640,9 @@ export function SearchFormCard({
               );
             })}
           </div>
-
-          <div className="mt-4">
-            <button
-              type="button"
-              disabled={!selectedPlan || anyBusy}
-              onClick={() => {
-                if (selectedPlan === "own" && ownTitleMissing) {
-                  setOwnTitleRequired(true);
-                  return;
-                }
-                setActiveStep("run");
-              }}
-              className={[
-                "w-full rounded-xl px-4 py-3 text-body font-semibold transition duration-200 transform-gpu",
-                !selectedPlan || anyBusy
-                  ? "bg-white/10 text-[var(--muted)] cursor-not-allowed scale-[1]"
-                  : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)] shadow-lg shadow-[rgba(111,68,45,0.25)] scale-[1.01]",
-              ].join(" ")}
-            >
-              Continue
-            </button>
-            {submitAttempted && !selectedPlan ? (
-              <div className="mt-2 text-caption font-semibold text-[var(--danger)]">Select a search method to continue.</div>
-            ) : null}
-          </div>
+          {submitAttempted && !selectedPlan ? (
+            <div className="mt-4 text-caption font-semibold text-[var(--danger)]">Select a search method to continue.</div>
+          ) : null}
 
           {selectedPlan === "automatic" ? (
             <div ref={automaticOptionsRef} className="mt-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-quiet)] p-4">
@@ -782,6 +766,32 @@ export function SearchFormCard({
             </div>
           ) : null}
 
+          </div>
+
+          {selectedPlan ? (
+            <div className="sticky bottom-0 z-10 mt-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.25rem)]">
+              <button
+                type="button"
+                disabled={!selectedPlan || anyBusy}
+                onClick={() => {
+                  if (selectedPlan === "own" && ownTitleMissing) {
+                    setOwnTitleRequired(true);
+                    return;
+                  }
+                  setActiveStep("run");
+                }}
+                className={[
+                  "mt-4 mb-2 w-full rounded-xl px-4 py-3 text-body font-semibold transition duration-200 transform-gpu",
+                  !selectedPlan || anyBusy
+                    ? "bg-white/10 text-[var(--muted)] cursor-not-allowed scale-[1]"
+                    : "bg-[var(--accent)] text-[#f9f1e2] hover:bg-[var(--accent-strong)] shadow-lg shadow-[rgba(111,68,45,0.25)] scale-[1.01]",
+                ].join(" ")}
+              >
+                Continue
+              </button>
+            </div>
+          ) : null}
+
         </div>
       );
     }
@@ -852,10 +862,9 @@ export function SearchFormCard({
                         <span className="step-tab__main">
                           <span className="step-tab__left">
                             <span className="step-tab__index" aria-hidden="true">
-                              {index + 1}
+                              <StepTabGlyph stepId={step.id} />
                             </span>
                             <span className="step-tab__text">
-                              <span className="step-tab__kicker">Step {index + 1}</span>
                               <span className="step-tab__title">{step.title}</span>
                             </span>
                           </span>
@@ -917,7 +926,7 @@ export function SearchFormCard({
                       <span className="step-tab__main">
                         <span className="step-tab__left">
                           <span className="step-tab__index" aria-hidden="true">
-                            {index + 1}
+                            <StepTabGlyph stepId={step.id} />
                           </span>
                           <span className="step-tab__text">
                             <span className="step-tab__kicker">Step {index + 1}</span>
